@@ -1,0 +1,2758 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ace Bowling V18.0 (Final)</title>
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#3498db">
+    
+    <link rel="apple-touch-icon" href="./icon-192x192.png">
+    <link rel="icon" sizes="512x512" href="./icon-512x512.png">
+    
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <style>
+        /* 기본 설정 */
+        :root { --primary: #2c3e50; --accent: #3498db; --danger: #e74c3c; --warning: #f39c12; --bg: #f8f9fa; --green: #27ae60; --dark: #34495e; --purple: #8e44ad; }
+        body { font-family: 'Pretendard', sans-serif; background: var(--bg); margin: 0; padding: 0; font-size: 14px; color: #333; min-height: 100vh; padding-bottom: 80px; -webkit-tap-highlight-color: transparent; }
+        
+        input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type="number"] { -moz-appearance: textfield; }
+
+        .container { max-width: 800px; margin: 0 auto; background: white; min-height: 100vh; display: flex; flex-direction: column; }
+        .header { padding: 15px; background: #fff; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 2000; }
+        
+        .tab-menu { display: flex; gap: 5px; padding: 10px; background: #fff; border-bottom: 1px solid #ddd; position: sticky; top: 53px; z-index: 1900; overflow-x: auto; white-space: nowrap; }
+        .tab-btn { flex: 1; padding: 12px 0; border: 1px solid #eee; background: #f8f9fa; border-radius: 8px; font-weight: bold; cursor: pointer; min-width: 60px; text-align: center; color: #555; }
+        .tab-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+        
+        .content-area { padding: 15px; flex: 1; margin-top: 5px; }
+        .panel { display: none; } .panel.active { display: block; }
+        .input-box { background: white; padding: 15px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #eee; box-shadow: 0 2px 5px rgba(0,0,0,0.03); }
+        .universal-btn { width: 100%; padding: 15px; font-weight: bold; border-radius: 8px; border: none; cursor: pointer; color: white; font-size: 1rem; margin-bottom: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .btn-sm { padding: 6px 12px; border-radius: 4px; border: 1px solid #ddd; cursor: pointer; font-size: 0.8rem; font-weight: bold; background: white; color: #333; }
+        
+        /* 팀카드 디자인 */
+        .team-card { border: 1px solid #ddd; border-radius: 8px; overflow: hidden; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .team-header { background: var(--purple); color: white; padding: 12px 15px; font-weight: bold; display: flex; justify-content: space-between; cursor: pointer; font-size:1.1rem; }
+        .team-body { padding: 0; background: white; }
+        
+        .lane-divider { display: flex; border-bottom: 1px solid #eee; }
+        .lane-half { flex: 1; padding: 10px; }
+        .lane-half:first-child { border-right: 1px dashed #ddd; }
+        .lane-title { font-size: 0.8rem; color: #888; text-align: center; margin-bottom: 5px; font-weight: bold; }
+
+        .member-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 10px; border-bottom: 1px solid #f5f5f5; }
+        
+        /* 랭크 탭 */
+        .rank-tabs { display: flex; gap: 5px; margin-bottom: 15px; overflow-x: auto; }
+        .rank-tab { flex: 1; padding: 8px; background: #fff; border: 1px solid #ddd; border-radius: 20px; cursor: pointer; text-align: center; font-weight: bold; min-width: 50px; }
+        .rank-tab.active { background: var(--primary); color: white; border-color: var(--primary); }
+        
+        /* 입력창 디자인 개선 */
+        .input-team-box { border: 2px solid #ddd; border-radius: 10px; margin-bottom: 15px; overflow: hidden; }
+        .input-team-header { background: #f1f3f5; padding: 10px; font-weight: bold; text-align: center; border-bottom: 1px solid #ddd; color: var(--primary); font-size: 1.1rem; }
+        .score-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; border-bottom: 1px solid #eee; background: white; }
+        .score-name { font-size: 1.2rem; font-weight: bold; color: #333; }
+        .score-input { width: 90px; padding: 12px; text-align: center; border: 2px solid #ccc; border-radius: 8px; font-size: 1.4rem; font-weight: bold; background: #fff; }
+        .score-input:focus { border-color: var(--accent); background: #f0f8ff; outline: none; }
+
+        /* 필터 안내 박스 */
+        #filterInfo { display:none; background:#f3e5f5; padding:12px; border-radius:8px; margin-bottom:15px; text-align:center; font-weight:bold; color:#8e44ad; border:1px solid #e1bee7; }
+
+        /* 조편성 설정 */
+        .lane-config-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; margin-top: 10px; }
+        .lane-input { width: 100%; text-align: center; border: 1px solid #ccc; border-radius: 4px; padding: 8px; font-weight: bold; font-size:1.1rem; box-sizing: border-box; margin-top: 5px; background: #fff; }
+        
+        .zone-btn { flex: 1; padding: 10px; border: 1px solid #ddd; background: #fff; border-radius: 6px; cursor: pointer; font-weight: bold; color: #555; }
+        .zone-btn.selected { background: #34495e; color: white; border-color: #34495e; }
+
+        table.stats-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin-bottom: 10px; }
+        table.stats-table th { background: #f1f3f5; padding: 8px; border: 1px solid #ddd; }
+        table.stats-table td { padding: 8px; border: 1px solid #ddd; text-align: center; }
+
+        #modalOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 9999; display: none; justify-content: center; align-items: center; }
+        .modal-box { background: white; width: 90%; max-width: 400px; border-radius: 12px; padding: 20px; max-height: 80vh; overflow-y: auto; }
+        .big-input { width: 100%; padding: 10px; font-size: 1rem; border-radius: 6px; border: 1px solid #ddd; margin-bottom: 10px; box-sizing: border-box; }
+        .big-select { width: 100%; padding: 12px; font-size: 1rem; border-radius: 6px; border: 1px solid #ddd; margin-bottom: 10px; background:white; font-weight:bold; }
+        
+        .filter-btn { padding: 6px 10px; border: 1px solid #ddd; background: white; border-radius: 15px; cursor: pointer; margin-right: 3px; font-size: 0.8rem; margin-bottom: 5px; }
+        .filter-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+        
+        .settings-label { font-weight: bold; display: block; margin-bottom: 5px; color: #555; }
+        .section-title { font-size: 1.1rem; font-weight: bold; color: var(--primary); margin: 20px 0 10px 0; border-left: 4px solid var(--accent); padding-left: 10px; }
+        
+        #landingPage, #globalLoginScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, #0f2027, #203a43, #2c5364); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 99999; color: white; }
+        .enter-btn { margin-top: 40px; padding: 15px 50px; font-size: 1.2rem; font-weight: bold; color: white; background: rgba(255,255,255,0.1); border: 2px solid white; border-radius: 50px; cursor: pointer; }
+        
+        .login-card { background: white; padding: 30px; border-radius: 15px; width: 80%; max-width: 350px; text-align: center; color: #333; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        .login-input { width: 100%; padding: 12px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
+        
+        /* 컨트롤 메뉴 */
+        .control-top-container { display: flex; gap: 8px; margin-bottom: 15px; }
+        .box-manager { flex: 1; background: #e3f2fd; border: 2px solid #90caf9; color: #1565c0; padding: 10px; border-radius: 8px; text-align: center; font-weight: bold; display: flex; flex-direction: column; justify-content: center; }
+        .btn-run-v13 { flex: 1.2; background: #2980b9; color: white; border: none; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .btn-reset-v13 { flex: 0.8; background: white; color: #c0392b; border: 2px solid #c0392b; border-radius: 8px; font-size: 0.9rem; font-weight: bold; cursor: pointer; }
+        
+        .lane-box-v13 { background: white; border: 1px solid #ccc; border-radius: 8px; padding: 5px; text-align: center; display: flex; flex-direction: column; gap: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .lane-label { color: #8e44ad; font-weight: bold; font-size: 0.9rem; margin-bottom: 2px; }      
+
+        /* ★★★ [반응형 핵심] 모바일(800px 이하)에서 세로로 강제 변경 ★★★ */
+        @media screen and (max-width: 800px) {
+            .lane-divider { display: flex !important; flex-direction: column !important; }
+            .lane-half { width: 100% !important; border-right: none !important; border-bottom: 2px dashed #d1c4e9 !important; padding: 15px 10px !important; box-sizing: border-box; }
+            .lane-half:last-child { border-bottom: none !important; }
+            .lane-config-grid { grid-template-columns: repeat(2, 1fr) !important; }
+            input, select, button { font-size: 16px !important; }
+        }
+        /* --- 카지노 칩 & 테이블 스타일 --- */
+        #casinoPanel { background: #1a472a; border-radius: 15px; padding: 20px; color: white; }
+        .casino-table { background: radial-gradient(circle, #27ae60, #1a472a); border: 10px solid #5d4037; border-radius: 30px; padding: 20px; box-shadow: inset 0 0 50px rgba(0,0,0,0.8); text-align: center; }
+        .chip-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 15px; }
+
+        .chip { width: 75px; height: 75px; border-radius: 50%; position: relative; cursor: pointer; transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); display: flex; justify-content: center; align-items: center; box-shadow: 0 6px 10px rgba(0,0,0,0.5); border: 5px dashed rgba(255,255,255,0.3); }
+        .chip:hover { transform: translateY(-5px) scale(1.05); }
+        .chip.selected { opacity: 0.6; cursor: default; transform: scale(0.9); filter: grayscale(0.5); }
+        .chip.red { background: radial-gradient(circle, #ff4d4d, #b30000); }
+        .chip.blue { background: radial-gradient(circle, #4da6ff, #0059b3); }
+        .chip.green { background: radial-gradient(circle, #5cd65c, #1e7b1e); }
+        .chip.yellow { background: radial-gradient(circle, #f1c40f, #f39c12); }
+
+        .chip-inner { width: 48px; height: 48px; background: white; border-radius: 50%; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #333; font-weight: 900; box-shadow: inset 0 2px 5px rgba(0,0,0,0.2); }
+        .chip-num { font-size: 1.3rem; }
+        .chip-owner { font-size: 0.65rem; color: #d63031; font-weight: bold; margin-top: -3px; }
+        .chip-lane { font-size: 1.1rem; color: #0984e3; }
+
+        .lane-input-touch { width: 100%; height: 40px; line-height: 40px; text-align: center; border: 1px solid #ccc; border-radius: 6px; font-weight: bold; font-size: 1.2rem; background: #fff; cursor: pointer; user-select: none; margin-top: 5px; }
+        .lane-input-touch:active { background: #e3f2fd; transform: scale(0.95); }
+        .team-input-touch { background: #f9f9f9; color: var(--purple); }
+
+        .admin-btn, #settings button { width: 280px !important; height: 45px !important; line-height: 45px !important; padding: 0 !important; margin: 10px auto !important; display: block !important; font-size: 16px !important; font-weight: bold !important; border-radius: 8px !important; text-align: center !important; border: none !important; cursor: pointer !important; }
+        .excel-green { background-color: #28a745 !important; color: white !important; }
+        .over-200 { color: #ff0000 !important; font-weight: bold !important; }
+    </style>
+</head>
+<body>
+
+    <div id="landingPage">
+        <h1 style="color:white; margin-bottom:20px; font-size:2.5rem;">ACE BOWLING</h1>
+        <p style="color:#eee; font-weight:bold;">V18.0</p>
+        <button class="enter-btn" onclick="window.showGlobalLogin()">앱 시작하기</button>
+    </div>
+
+    <div id="globalLoginScreen" style="display:none;">
+        <div class="login-card">
+            <h2 style="color:var(--primary); margin-bottom:20px;">🔐 회원 로그인</h2>
+            <input type="text" id="globalId" class="login-input" placeholder="이름">
+            <input type="password" id="globalPw" class="login-input" placeholder="비밀번호">
+            <button class="universal-btn" onclick="window.doGlobalLogin()" style="background:var(--accent);">로그인</button>
+        </div>
+    </div>
+
+    <div class="container" id="mainContainer" style="display:none;">
+        <div class="header">
+            <h2 style="margin:0; font-size:1.3rem;">Ace Bowling V18.0</h2>
+            <div style="display:flex; align-items:center; gap:10px;">
+                <span id="userInfo" style="font-weight:bold; color:var(--primary); font-size:0.9rem;"></span>
+                <button id="logoutBtn" onclick="window.logout()" style="padding:6px 12px; background:var(--danger); color:white; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">로그아웃</button>
+            </div>
+        </div>
+
+        <div class="tab-menu" id="mainTabMenu">
+            <button class="tab-btn active" onclick="window.showPanel('attendPanel', this)">1.참석</button>
+            <button class="tab-btn" onclick="window.showPanel('groupPanel', this)">2.조편성</button>
+            <button class="tab-btn" onclick="window.showPanel('casinoPanel', this)">🎰 카지노</button>
+            <button class="tab-btn" onclick="window.showPanel('progressPanel', this)">3.진행</button>
+            <button class="tab-btn" onclick="window.clickInputTab(this)">4.입력</button>
+            <button class="tab-btn" onclick="window.showPanel('statsPanel', this)">통계</button>
+            <button class="tab-btn" onclick="window.showPanel('memberPanel', this)">회원관리</button>
+            <button class="tab-btn" id="settingsTabBtn" onclick="window.showPanel('settingsPanel', this)" style="display:none;">⚙️ 설정</button>
+        </div>
+
+        <div class="content-area">
+            
+            <div id="attendPanel" class="panel active">
+                <div id="adminEventCreate" class="input-box" style="display:none; border:2px solid var(--accent);">
+                    <h4 style="margin-top:0; color:var(--accent);">📅 새 모임 일정 등록 (공지)</h4>
+                    <div style="display:flex; gap:5px; margin-bottom:10px;">
+                        <input type="date" id="eventDate" class="big-input" style="flex:1.5; margin-bottom:0;">
+                        <input type="time" id="eventExactTime" class="big-input" style="flex:1.2; margin-bottom:0;" value="14:00">
+                    </div>
+                    <select id="eventMode" class="big-select">
+                        <option value="regular">⚖️ 정기모임 (4G)</option>
+                        <option value="lightning">⚡ 번개모임 (6G)</option>
+                    </select>
+                    <button class="universal-btn" style="background:var(--accent); margin-bottom:0;" onclick="window.createEvent()">모임 일정 등록</button>
+                </div>
+
+                <div class="section-title">🗓️ 예정된 모임 및 참석 신청</div>
+                <div id="eventListArea"></div>
+
+                <input type="file" id="excelInput" accept=".xlsx, .xls" style="display:none;">
+            </div>
+
+            <div id="groupPanel" class="panel">
+                <div class="input-box">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                        <h3 id="modeDisplay" style="margin:0; font-size:1.1rem; color:var(--primary);">⚖️ 정기모임 (4게임)</h3>
+                        <button class="btn-sm" onclick="window.toggleMode()" style="background:var(--dark); color:white;">🔄 모드 전환</button>
+                    </div>
+
+                    <div id="assignGameTabs" class="rank-tabs" style="margin: 15px 0;"></div>
+
+                    <label style="font-weight:bold; color:var(--warning); display:block; margin-bottom:5px;">1. 구역 선택 (레인 구조)</label>
+                    <div style="display:flex; gap:5px; margin-bottom:15px;">
+                        <button class="zone-btn" id="z1" onclick="window.toggleZone(1)">1구역</button>
+                        <button class="zone-btn" id="z2" onclick="window.toggleZone(2)">2구역</button>
+                        <button class="zone-btn" id="z3" onclick="window.toggleZone(3)">3구역</button>
+                        <button class="zone-btn" id="z4" onclick="window.toggleZone(4)">4구역</button>
+                        <button class="zone-btn" id="z5" onclick="window.toggleZone(5)">5구역</button>
+                    </div>
+                </div>
+
+                <div class="preset-container" style="margin: 20px 0; padding: 12px; background: #fdfdfd; border-radius: 10px; border: 1px dashed #ccc; box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);">
+                    <label style="font-weight:bold; display:block; margin-bottom:10px; color:#2c3e50; font-size:0.9rem;">⚡ 조편성 퀵 자동 설정</label>
+                    <div style="display:flex; gap:6px;">
+                        <button type="button" class="btn-sm" style="flex:1; background:#3498db; color:white; border:none; height:42px; border-radius:6px; font-weight:bold;" onclick="window.applyPreset(2)">2인조</button>
+                        <button type="button" class="btn-sm" style="flex:1; background:#27ae60; color:white; border:none; height:42px; border-radius:6px; font-weight:bold;" onclick="window.applyPreset(3)">3인조</button>
+                        <button type="button" class="btn-sm" style="flex:1; background:#e67e22; color:white; border:none; height:42px; border-radius:6px; font-weight:bold;" onclick="window.applyPreset(4)">4인조</button>
+                    </div>
+                </div>
+
+                <label style="font-weight:bold; color:var(--primary); display:block; margin-bottom:5px;">2. 참석 현황 및 레인 배정</label>
+                <hr style="border:0; border-top:1px solid #eee; margin:10px 0;">
+                <label style="font-weight:bold; color:#27ae60; display:block; margin-bottom:5px;">2-1. 조편성 방식 선택</label>
+                <select id="groupAssignMethod" class="big-select" style="margin-bottom:15px;" onchange="window.changeAssignMethod(this.value)">
+                    <option value="ai">🤖 AI 밸런스</option>
+                    <option value="random">🎲 랜덤 (무작위)</option>
+                </select>
+
+                <label style="font-weight:bold; color:#8e44ad; display:block; margin-bottom:8px;">3. 레인별 인원 설정</label>
+                <div class="control-top-container">
+                    <div class="box-manager">
+                        <span style="font-size:0.8rem; opacity:0.8;">👑 정모장</span>
+                        <span id="displayJungmoName">미정</span>
+                    </div>
+                    
+                    <button class="btn-run-v13" onclick="window.runGeneralAssignment()">⚖️ 일반 배정</button>
+                    
+                    <button class="universal-btn" style="background:#f39c12; flex:1; margin-bottom:0;" 
+                            onclick="window.startCasinoAssignment()">🎰 카지노 배정</button>
+                            
+                    <button class="btn-reset-v13" onclick="window.resetAssignment()">🗑️ 초기화</button>
+                </div>
+                <div id="laneConfigArea" class="lane-config-grid"></div>
+                <div style="text-align:right; font-weight:bold; margin-top:10px;">
+                    설정 인원 합계: <span id="totalConfigCount" style="color:var(--danger); font-size:1.1rem;">0</span>명
+                </div>
+
+                <div id="lightningManagerSelect" class="input-box" style="display:none; border:2px solid #f39c12; background:#fffcf5; margin-top:20px;">
+                    <h3 style="color:#d35400; margin-top:0;">⚡ 번개장 선출</h3>
+                    <div style="display:flex; gap:5px;">
+                        <select id="bungaeJangSelect" class="big-select" style="margin-bottom:0;"></select>
+                        <button class="btn-sm" style="background:#f39c12; color:white; width:80px;" onclick="window.setBungaeManager()">임명</button>
+                    </div>
+                    <div style="margin-top:10px; font-weight:bold;">현재 번개장: <span id="currentBungaeJang" style="color:#d35400;">없음</span></div>
+                </div>
+            </div>
+
+            <div id="casinoPanel" class="panel">
+                <div class="casino-table">
+                    <h2 style="color: #f1c40f; margin-top:0; text-shadow: 2px 2px 4px #000;">🎰 ACE CASINO TABLE</h2>
+                    <div id="casinoStatus" style="font-size:1rem; margin-bottom:20px; color:#fff; font-weight:bold;">
+                        원하는 번호의 칩을 빠르게 선택하세요!
+                    </div>
+                    
+                    <div class="tier-zone" id="zone_red">
+                        <div style="color:#ff7675; font-weight:bold; font-size:0.9rem; margin-bottom:5px;">🔴 RED CHIPS (상위)</div>
+                        <div id="chips_red" class="chip-container"></div>
+                    </div>
+                    <div class="tier-zone" id="zone_blue" style="margin-top:25px;">
+                        <div style="color:#74b9ff; font-weight:bold; font-size:0.9rem; margin-bottom:5px;">🔵 BLUE CHIPS (중위)</div>
+                        <div id="chips_blue" class="chip-container"></div>
+                    </div>
+                    <div class="tier-zone" id="zone_green" style="margin-top:25px; display:none;">
+                        <div style="color:#55efc4; font-weight:bold; font-size:0.9rem; margin-bottom:5px;">🟢 GREEN CHIPS (하위)</div>
+                        <div id="chips_green" class="chip-container"></div>
+                    </div>
+                    <div class="tier-zone" id="zone_yellow" style="margin-top:25px; display:none;">
+                        <div style="color:#f1c40f; font-weight:bold; font-size:0.9rem; margin-bottom:5px;">🟡 YELLOW CHIPS (최하위)</div>
+                        <div id="chips_yellow" class="chip-container"></div>
+                    </div>
+                    <div id="adminCasinoControls" style="margin-top:40px; border-top:1px solid rgba(255,255,255,0.2); padding-top:20px;">
+                        <button class="universal-btn" style="background:#f1c40f; color:#000;" onclick="window.initCasino()">🎲 카지노판 새로 깔기 (칩 생성)</button>
+                        <button class="universal-btn" style="background:#e67e22; margin-top:10px;" onclick="window.finishCasino()">👻 고스트 확인 및 배정 종료</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="progressPanel" class="panel">
+                <div class="input-box">
+                    <input type="date" id="progDate" class="big-input" style="width:auto; margin-bottom:15px;" onchange="window.renderGameProgress()">
+                    <div id="progTabs" class="rank-tabs"></div>
+                    <div id="teamCardArea"></div>
+                </div>
+            </div>
+
+            <div id="inputPanel" class="panel">
+                <div id="scoreSection">
+                    <div class="input-box">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                            <h3 style="margin:0;">📝 점수 입력 (<span id="inputGameTitle">1G</span>)</h3>
+                            <button class="btn-sm" onclick="window.saveAllScores()" style="background:var(--accent); color:white; border:none;">💾 저장</button>
+                        </div>
+                        
+                        <div id="filterInfo" style="display:none; background:#f3e5f5; padding:12px; border-radius:8px; margin-bottom:15px; text-align:center; font-weight:bold; color:#8e44ad; border:1px solid #e1bee7;">
+                            <span id="filterTeamName"></span> 점수 입력 중...
+                        </div>
+
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                            <input type="date" id="inputDate" class="big-input" style="width:60%; margin:0;" onchange="window.renderInputs()">
+                            <button class="btn-sm" onclick="window.showAllTeams()" style="background:#95a5a6; color:white;">📂 전체 보기</button>
+                        </div>
+                        
+                        <div id="inputTabs" class="rank-tabs"></div>
+                        <div id="inputGridArea" style="margin-top:15px;"></div>
+                        
+                        <button class="universal-btn" onclick="window.saveAllScores()" style="background:var(--accent); margin-top:20px;">💾 점수 저장 완료</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="statsPanel" class="panel">
+                <div class="input-box">
+                    <div class="section-title">📈 기간별 개인 에버 (기록)</div>
+                    <div style="margin-bottom:15px; display:flex; flex-wrap:wrap;">
+                        <button class="filter-btn active" id="btn_period_all" onclick="window.setStatsPeriod('all', this)">전체</button>
+                        <button class="filter-btn" onclick="window.setStatsPeriod('1m', this)">1개월</button>
+                        <button class="filter-btn" onclick="window.setStatsPeriod('3m', this)">3개월</button>
+                        <button class="filter-btn" onclick="window.setStatsPeriod('6m', this)">6개월</button>
+                        <button class="filter-btn" onclick="window.setStatsPeriod('12m', this)">12개월</button>
+                    </div>
+                    <div id="historicalStatsTable"></div>
+                    <hr style="margin: 20px 0;">
+                    <div class="section-title">⚡ 금일 게임별 순위</div>
+                    <div id="statsGameTabs" class="rank-tabs"></div>
+                    <h4 style="margin-top:10px;">🏆 팀 순위</h4>
+                    <div id="currentTeamRankTable"></div>
+                    <h4 style="margin-top:20px;">🏅 개인 순위</h4>
+
+                    <div style="margin-bottom:10px; display:flex; gap:5px;">
+                        <button class="filter-btn active" onclick="window.filterCurrentStats('all', this)">전체</button>
+                        <button class="filter-btn" onclick="window.filterCurrentStats('남', this)">남성</button>
+                        <button class="filter-btn" onclick="window.filterCurrentStats('여', this)">여성</button>
+                    </div>
+                    <div id="currentIndivRankTable"></div>
+                    <div class="section-title" style="margin-top:40px; border-left:4px solid var(--danger);">👑 오늘의 최종 합계 순위 (전체 게임 누적)</div>
+                    <div id="todayTotalRankTable"></div>      
+                </div>
+            </div>
+
+            <div id="memberPanel" class="panel">
+                <div id="adminMemberControls" class="input-box" style="display:none; border:2px solid var(--green);">
+                    <h4 style="margin-top:0;">➕ 신규 회원 추가</h4>
+                    <input type="text" id="newMemName" class="big-input" placeholder="이름 입력">
+                    <div style="display:flex; gap:10px;">
+                        <select id="newMemGender" class="big-select" onchange="window.checkGender(this)">
+                            <option value="남">남성</option>
+                            <option value="여">여성</option>
+                        </select>
+                        <input type="number" id="newMemHandicap" class="big-input" placeholder="핸디" value="0">
+                    </div>
+                    <button class="universal-btn" style="background:var(--green);" onclick="window.addMember()">회원 저장</button>
+                </div>
+                <div class="input-box">
+                    <h4>📂 회원 목록</h4>
+                    <div id="memberListArea"></div>
+                </div>
+            </div>
+
+            <div id="settingsPanel" class="panel">
+                <div id="adminJungmoSetting" class="input-box" style="display:none; border:2px solid var(--primary);">
+                    <h3>👑 정모장 임명</h3>
+                    <div style="margin-bottom:10px; font-weight:bold; color:var(--primary);">
+                        현재 정모장: <span id="currentJungmoJangSetting" style="color:var(--accent);">없음</span>
+                    </div>
+                    <div style="display:flex; gap:5px;">
+                        <input type="text" id="jungmoJangInput" class="big-input" placeholder="회원 이름 입력">
+                        <button class="btn-sm" style="background:var(--primary); color:white;" onclick="window.setJungmoManager()">저장</button>
+                    </div>
+                </div>
+
+                <div class="input-box" style="border:2px solid var(--accent);">
+                    <h3 style="color:var(--accent); margin-top:0;">⚙️ 운영 기준 설정</h3>
+                    <button onclick="document.getElementById('excelInput').click()" class="admin-btn excel-green">📊 정모점수명단 업로드</button>
+                    <button onclick="downloadExcel()" class="admin-btn">📊 정모점수 다운로드</button>
+                    
+                    <label class="settings-label">가중치 에버 반영 기간 (개월)</label>
+                    <input type="number" id="setAvgCriteria" class="big-input" value="6" placeholder="기본 6개월">
+                    <small style="color:#666; display:block; margin-bottom:15px;">* 설정한 기간만큼의 성적을 계산하여 실력을 평가합니다.</small>
+
+                    <label class="settings-label">기본 조편성 방식</label>
+                    <select id="setAssignMethod" class="big-select">
+                        <option value="ai">🤖 AI 밸런스</option>
+                        <option value="random">🎲 랜덤 (무작위)</option>
+                    </select>
+
+                    <button class="universal-btn" style="background:var(--accent); margin-top:10px;" onclick="window.saveSettings()">⚙️ 기준값 저장</button>
+                </div>
+                <div class="input-box" style="border:2px solid var(--purple);">
+                    <h4 style="color:var(--purple); margin-top:0;">💾 데이터 백업 및 복구</h4>
+                    <p style="font-size:0.8rem; color:#666; margin-bottom:15px;">* 현재 모든 데이터를 파일로 저장하거나 보관된 파일을 불러옵니다.</p>
+                    
+                    <div style="display:flex; gap:5px;">
+                        <button class="universal-btn" style="background:var(--purple); flex:1;" onclick="window.exportData()">파일 내보내기</button>
+                        <button class="universal-btn" style="background:var(--dark); flex:1;" onclick="document.getElementById('importFile').click()">파일 불러오기</button>
+                    </div>
+                    <input type="file" id="importFile" style="display:none;" accept=".json" onchange="window.importData(event)">
+                </div>
+                <div class="input-box" style="border:1px solid var(--danger);">
+                    <h4 style="color:var(--danger); margin-top:0;">🚨 데이터 관리</h4>
+                    <button class="universal-btn" style="background:var(--danger);" onclick="window.deleteToday()">🗑️ 오늘 점수만 삭제</button>
+                    <button class="universal-btn" style="background:#8e44ad; margin-top:5px;" onclick="window.deleteAllData()">💥 데이터 완전 초기화</button>
+                    <button class="universal-btn" style="background:#95a5a6; margin-top:5px;" onclick="window.resetAttendance()">🔄 참석 초기화</button>
+                </div>
+            </div>
+        </div>
+
+    <div id="modalOverlay" onclick="window.closeModal()">
+        <div class="modal-box" onclick="event.stopPropagation()">
+            <h3 id="modalTitle" style="margin-top:0;"></h3>
+            <div id="modalContent"></div>
+            <button class="universal-btn" style="background:#333; margin-top:20px;" onclick="window.closeModal()">닫기</button>
+        </div>
+    </div>
+
+<script>
+    let members=[], attendees=[], records=[], gameTeams={}, events={};
+    let settings = { mode: 'regular', gameCount: 4, avgCriteria: 6, assignMethod: 'ai' };
+    let managers = { jungmo: '', lightning: '' }; 
+    let selectedBlocks = [], laneSettings = {};   
+    let db = null;
+    let loggedInUser = localStorage.getItem('loggedInUser');
+    let isAdmin = localStorage.getItem('ace_admin') === 'true';
+    
+    let currentRankView = 1, currentInputGame = 1, currentTargetGame = 1;
+    let currentStatsGame = 1, currentStatsPeriod = 'all', currentGenderFilter = 'all';
+    let currentInputTeam = null; 
+
+    firebase.initializeApp({ databaseURL: "https://ilsan-ace-bowling-team-default-rtdb.asia-southeast1.firebasedatabase.app" });
+    db = firebase.database();
+
+    db.ref('bowling_v14').on('value', sn => {
+    const val = sn.val() || {};
+    
+    members = val.members ? Object.keys(val.members).map(k => ({ ...val.members[k], key: k })) : [];
+    attendees = val.attendees || [];
+    gameTeams = val.gameTeams || {};
+    records = val.records ? Object.keys(val.records).map(k => ({ ...val.records[k], key: k })) : [];
+    
+    if(val.settings) settings = val.settings;
+    if(val.managers) managers = val.managers; 
+    if(val.laneSettings) laneSettings = val.laneSettings; 
+    if(val.selectedBlocks) selectedBlocks = val.selectedBlocks; 
+    events = val.events || {};
+
+    if (!window.initialLoadDone) {
+        window.currentTargetGame = 1; 
+        window.initialLoadDone = true; 
+    }
+
+    if (typeof window.updateUI === 'function') {
+        window.updateUI();
+    }
+});
+
+
+// ========================================================
+// 🛠️ 이 덩어리를 통째로 복사해서 에러 나는 위치에 붙여넣으세요
+// ========================================================
+// 1. 설정 및 화면 이동 동기화
+db.ref('bowling_v14/settings').on('value', sn => {
+    const val = sn.val();
+    if (!val || !val.currentTab) return;
+
+    if (val.currentAssignGame) currentTargetGame = val.currentAssignGame;
+    if (val.currentRankView) currentRankView = val.currentRankView;
+    if (val.currentInputGame) currentInputGame = val.currentInputGame;
+
+    if (val.currentInputGame && window.renderInputs) {
+        window.renderInputs();
+    }
+
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    let btnIdx = 0; 
+    if (val.currentTab === 'groupPanel') btnIdx = 1;
+    else if (val.currentTab === 'casinoPanel') btnIdx = 2;
+    else if (val.currentTab === 'progressPanel') btnIdx = 3;
+    else if (val.currentTab === 'inputPanel') btnIdx = 4;
+    else if (val.currentTab === 'statsPanel') btnIdx = 5;
+
+    window.showPanel(val.currentTab, tabBtns[btnIdx]);
+});
+
+// 2. 카지노 실시간 감지
+db.ref('bowling_v14/casino').on('value', () => {
+    if(window.renderCasino) window.renderCasino();
+});   
+
+// 3. 엔터키로 다음 입력칸 이동
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+        const inputs = Array.from(document.querySelectorAll('.lane-input'));
+        const index = inputs.indexOf(document.activeElement);
+        if (index > -1 && index < inputs.length - 1) {
+            e.preventDefault(); 
+            inputs[index + 1].focus(); 
+        }
+    }
+});
+
+// 4. 앱 진입 함수
+window.enterApp = function() {
+    const landing = document.getElementById('landingPage');
+    if(landing) landing.style.display = 'none';
+    if(typeof window.showGlobalLogin === 'function') window.showGlobalLogin();
+};
+
+    window.showGlobalLogin = function() {
+        if(localStorage.getItem('loggedInUser')) {
+            document.getElementById('landingPage').style.display = 'none';
+            document.getElementById('globalLoginScreen').style.display = 'none';
+            document.getElementById('mainContainer').style.display = 'block';
+            window.updateUI();
+
+            const firstTabBtn = document.querySelectorAll('.tab-btn')[0];
+            window.showPanel('attendPanel', firstTabBtn);
+            
+        } else {
+            document.getElementById('landingPage').style.display = 'none';
+            document.getElementById('globalLoginScreen').style.display = 'flex';
+        }
+    };
+
+    window.doGlobalLogin = function() {
+        const i = document.getElementById('globalId').value.trim();
+        const p = document.getElementById('globalPw').value.trim();
+        if((i==='관리자'||i==='김범주') && p==='6884') {
+            localStorage.setItem('loggedInUser', i);
+            localStorage.setItem('ace_admin', 'true');
+            location.reload();
+        } else {
+            const m = members.find(x=>x.name===i);
+            if(m && (m.pw||'1234')===p) {
+                localStorage.setItem('loggedInUser', i);
+                localStorage.setItem('ace_admin', 'false');
+                location.reload();
+            } else alert("로그인 실패! 이름과 비밀번호를 확인하세요.");
+        }
+    };
+
+    
+window.updateUI = function() {
+    if(!loggedInUser) return;
+
+    const myName = loggedInUser.trim();
+    const isL = settings.mode === 'lightning';
+    const uInfo = document.getElementById('userInfo');
+    const settingsTab = document.getElementById('settingsTabBtn');
+    
+    if(uInfo) uInfo.innerText = `${loggedInUser} ${isAdmin ? '(관리자)' : ''}`;
+    if(settingsTab) settingsTab.style.display = isAdmin ? 'block' : 'none';
+
+    for(let i=1; i<=5; i++) {
+        const btn = document.getElementById('z'+i);
+        if(btn) {
+            if(selectedBlocks.includes(i)) btn.classList.add('selected');
+            else btn.classList.remove('selected');
+        }
+    }
+    if(window.renderCustomLaneConfig) window.renderCustomLaneConfig(); 
+
+    const panelTitle = document.getElementById('modeDisplay');
+    if(panelTitle) {
+        panelTitle.innerHTML = isL ? 
+            '<span style="color:#e67e22;">⚡ 번개모임 (6게임)</span>' : 
+            '<span style="color:#2c3e50;">⚖️ 정기모임 (4게임)</span>';
+    }
+
+    const jName = document.getElementById('displayJungmoName');
+    const managerLabel = document.querySelector('.box-manager span:first-child');
+
+    if (jName) {
+        jName.innerText = isL ? (managers.lightning || '미정') : (managers.jungmo || '미정');
+        
+        if (managerLabel) {
+            managerLabel.innerText = isL ? '⚡ 번개장' : '👑 정모장';
+        }
+    }
+
+    const currentJungmoJang = (managers.jungmo || "").trim();
+    const currentBungaeJang = (managers.lightning || "").trim();
+    let hasPower = isAdmin || (isL ? currentBungaeJang === myName : currentJungmoJang === myName);
+
+    const eventCreateBox = document.getElementById('adminEventCreate');
+    const eventSelectBox = document.getElementById('activeMeetingSelector');
+    const memAdminBox = document.getElementById('adminMemberControls');
+    const jungmoSettingBox = document.getElementById('adminJungmoSetting');
+    const bBox = document.getElementById('lightningManagerSelect');
+
+    if(eventCreateBox) eventCreateBox.style.display = hasPower ? 'block' : 'none';
+    if(eventSelectBox) eventSelectBox.style.display = hasPower ? 'block' : 'none';
+    if(memAdminBox) memAdminBox.style.display = hasPower ? 'block' : 'none';
+    if(jungmoSettingBox) jungmoSettingBox.style.display = isAdmin ? 'block' : 'none';
+    
+    if(bBox) {
+        bBox.style.display = isL ? 'block' : 'none';
+        if(isL && typeof window.renderBungaeJangSelect === 'function') window.renderBungaeJangSelect();
+    }
+
+    const jSettingName = document.getElementById('currentJungmoJangSetting');
+    if (jSettingName) jSettingName.innerText = managers.jungmo || '없음';
+
+    const bNameSpan = document.getElementById('currentBungaeJang');
+    if (bNameSpan) bNameSpan.innerText = managers.lightning || '없음';
+
+    if(typeof window.renderEventList === 'function') window.renderEventList();
+    if(typeof window.renderAssignGameTabs === 'function') window.renderAssignGameTabs(); 
+    if(typeof window.renderMembers === 'function') window.renderMembers();
+    if(typeof window.renderCasino === 'function') window.renderCasino();
+
+    if(document.getElementById('groupAssignMethod')) 
+        document.getElementById('groupAssignMethod').value = settings.assignMethod || 'snake';
+    if(document.getElementById('setAssignMethod')) 
+        document.getElementById('setAssignMethod').value = settings.assignMethod || 'snake';
+const activePanel = document.querySelector('.panel.active');
+    if(activePanel) {
+        // 진행 화면이면 점수판 다시 그리기
+        if(activePanel.id === 'progressPanel' && typeof window.renderGameProgress === 'function') {
+            window.renderGameProgress();
+        }
+        // 입력 화면이면 입력창 다시 그리기
+        if(activePanel.id === 'inputPanel' && typeof window.renderInputs === 'function') {
+            window.renderInputs();
+        }
+        // 통계 화면이면 통계표 다시 그리기
+        if(activePanel.id === 'statsPanel' && typeof window.renderAllStats === 'function') {
+            window.renderAllStats();
+        }
+    }
+    };
+window.createEvent = function() {
+    const date = document.getElementById('eventDate').value;
+    const exactTime = document.getElementById('eventExactTime').value; 
+    const mode = document.getElementById('eventMode').value;
+    
+    if(!date || !exactTime) return alert("날짜와 시간을 모두 확인해 주세요!");
+
+    const combinedTime = exactTime; 
+    const id = `${date}_${exactTime.replace(':', '')}`; 
+    
+    db.ref('bowling_v14/events/' + id).set({ 
+        id, 
+        date, 
+        time: combinedTime, 
+        mode, 
+        attendees: [] 
+    }).then(() => {
+        alert("✅ 모임 공지 완료!");
+    });
+};
+    const formatTime = (t) => {
+        if(!t) return "";
+        let [h, m] = t.split(':');
+        h = parseInt(h);
+        const ampm = h < 12 ? '오전' : '오후';
+        h = h % 12 || 12; // 0시는 12시로 표시
+        return `${ampm} ${String(h).padStart(2, '0')}:${m}`;
+    };
+window.renderBungaeJangSelect = function() {
+    const sel = document.getElementById('bungaeJangSelect');
+    if (!sel) return;
+
+    const list = attendees || [];
+    let html = '<option value="">-- 번개장 선택 --</option>';
+
+    if (list.length === 0) {
+        html = '<option value="">신청자가 없습니다</option>';
+    } else {
+        list.forEach(name => {
+            const isSelected = (managers.lightning === name) ? 'selected' : '';
+            html += `<option value="${name}" ${isSelected}>${name}</option>`;
+        });
+    }
+
+    sel.innerHTML = html;
+};
+    window.renderEventList = function() {
+    const area = document.getElementById('eventListArea');
+    if(!area) return;
+
+    const now = new Date().toISOString().split('T')[0];
+    let html = '';
+
+    const myName = (loggedInUser || "").trim();
+    const isL = settings.mode === 'lightning';
+    const hasPower = isAdmin || (isL ? (managers.lightning === myName) : (managers.jungmo === myName));
+
+    const sortedIds = Object.keys(events || {}).sort((a, b) => b.localeCompare(a));
+    const commonBtnStyle = "width: 95px; height: 38px; font-size: 0.9rem; font-weight: bold; border-radius: 8px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;";
+
+    sortedIds.forEach(id => {
+        const ev = events[id];
+        if (ev.date < now) return;
+
+        const list = ev.attendees || [];
+        const joined = list.includes(loggedInUser);
+        
+        const fCount = list.filter(n => members.find(m => m.name === n)?.gender === '여').length;
+        const mCount = list.length - fCount;
+
+        html += `
+        <div class="input-box" style="border-left:10px solid ${ev.mode==='regular'?'#6741d9':'#f08c00'}; padding:18px; margin-bottom:25px; border-radius:15px; box-shadow:0 6px 15px rgba(0,0,0,0.06);">
+            
+            <div style="margin-bottom:15px;">
+                <div style="font-size:0.85rem; color:#888;">${ev.date}</div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <b style="font-size:1.35rem; color:#222;">${formatTime(ev.time)}</b>
+                    <span style="font-size:0.75rem; background:#f1f3f5; color:#666; padding:2px 8px; border-radius:4px; font-weight:bold;">
+                        ${ev.mode==='regular'?'⚖️ 정기':'⚡ 번개'}
+                    </span>
+                </div>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; background:#f8f9fa; padding:12px; border-radius:12px; border:1px solid #eee;">
+                <div style="font-size:0.9rem; color:#495057;">
+                    <b style="font-size:1rem; color:#222;">👥 ${list.length}명</b> 
+                    <div style="margin-top:2px; font-size:0.8rem; color:#888;">
+                        <span style="color:#339af0;">남 ${mCount}</span> / <span style="color:#ff922b;">여 ${fCount}</span>
+                    </div>
+                </div>
+                
+                <div style="display:flex; gap:6px;">
+                    <button style="${commonBtnStyle} background:${joined?'#ff6b6b':'#20c997'}; color:white;" 
+                        onclick="window.toggleEventJoin('${id}')">
+                        ${joined ? '참석취소' : '신청하기'}
+                    </button>
+                    
+                    ${hasPower ? `
+                        <button style="${commonBtnStyle} background:#6741d9; color:white;" 
+                            onclick="window.activateSelectedEventDirect('${id}')">
+                            게임시작 🚀
+                        </button>
+                        <button style="width: 40px; height: 38px; border-radius: 8px; border: 1px solid #e03131; background: #fff; color: #e03131; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0;" 
+                            onclick="window.deleteEvent('${id}')">
+                            🗑️
+                        </button>
+                        ` : ''}
+                </div>
+            </div>
+
+            ${hasPower ? `
+            <div style="margin-top:15px; display:flex; gap:5px; padding-top:10px; border-top:1px dashed #ddd;">
+                <select id="adminAddSelect_${id}" class="btn-sm" style="flex:1; height:38px; border:1px solid var(--accent);">
+                    <option value="">-- 대리 신청 (회원 선택) --</option>
+                    ${members.sort((a,b)=>a.name.localeCompare(b.name)).map(m => `<option value="${m.name}">${m.name}</option>`).join('')}
+                </select>
+                <button class="btn-sm" style="background:var(--accent); color:white; border:none; width:60px;"
+                    onclick="window.toggleEventJoin('${id}', document.getElementById('adminAddSelect_${id}').value)">
+                    추가
+                </button>
+            </div>
+            ` : ''}
+
+            <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:15px;">
+                ${list.map((name, idx) => {
+                    const mInfo = members.find(m => m.name === name) || { gender: '남', handicap: 0 };
+                    return `
+                        <div style="background:${mInfo.gender==='여'?'#fff0f6':'#e7f5ff'}; border:1px solid ${mInfo.gender==='여'?'#ffdeeb':'#d0ebff'}; padding:6px 12px; border-radius:20px; font-size:0.85rem; display:flex; align-items:center;">
+                            <span style="color:#adb5bd; font-size:0.7rem; margin-right:4px;">${idx + 1}</span> 
+                            <b>${name}</b> 
+                            <span style="margin-left:4px; color:#845ef7; font-weight:bold;">${mInfo.handicap}</span>
+                            ${hasPower ? `<span style="color:#fa5252; margin-left:6px; cursor:pointer; font-weight:bold; font-size:1rem;" onclick="window.kickMember('${id}', '${name}')">×</span>` : ''}
+                        </div>`;
+                }).join('') || '<div style="color:#dee2e6; width:100%; text-align:center; padding:10px;">첫 번째 신청자가 되어보세요!</div>'}
+            </div>
+        </div>`;
+    });
+
+    area.innerHTML = html || '<div style="text-align:center; padding:50px; color:#adb5bd;">모임 일정이 없습니다.</div>';
+};
+
+window.renderAllStats = function() {
+    if(typeof window.renderHistoricalStats === 'function') window.renderHistoricalStats();
+    if(typeof window.renderStatsGameTabs === 'function') window.renderStatsGameTabs();
+    if(typeof window.renderCurrentGameStats === 'function') window.renderCurrentGameStats(); 
+
+    const panel = document.getElementById('statsPanel');
+    if(!panel) return;
+
+    // 기존 히스토리 영역 제거 후 새로 생성
+    const oldNav = document.getElementById('historyNavContainer');
+    if(oldNav) oldNav.remove();
+
+    const navDiv = document.createElement('div');
+    navDiv.id = 'historyNavContainer';
+    navDiv.style.cssText = "margin-bottom:20px; padding:15px; background:#f8f9fa; border-radius:12px; border:1px solid #eee;";
+    navDiv.innerHTML = `
+        <div style="margin-bottom:12px;">
+            <div style="font-size:0.8rem; color:#e03131; font-weight:bold; margin-bottom:5px;">📅 최근 정기모임 기록</div>
+            <div id="regularDateButtons" style="display:flex; gap:8px; overflow-x:auto; padding-bottom:5px;">
+                 <span style="font-size:0.8rem; color:#ccc;">불러오는 중...</span>
+            </div>
+        </div>
+        <div>
+            <div style="font-size:0.8rem; color:#fab005; font-weight:bold; margin-bottom:5px;">⚡ 최근 번개 기록</div>
+            <div id="lightningDateButtons" style="display:flex; gap:8px; overflow-x:auto; padding-bottom:5px;">
+                 <span style="font-size:0.8rem; color:#ccc;">불러오는 중...</span>
+            </div>
+        </div>
+    `;
+    panel.prepend(navDiv);
+
+    // 버튼 그리기 실행
+    if(typeof window.renderRegularHistoryButtons === 'function') window.renderRegularHistoryButtons();
+    if(typeof window.renderLightningHistoryButtons === 'function') window.renderLightningHistoryButtons();
+
+    // 하단 저장 버튼 구역 (관리자 전용)
+    const totalRankArea = document.getElementById('todayTotalRankTable');
+    if(totalRankArea && isAdmin) {
+        const oldFinalize = document.getElementById('finalizeBtnArea');
+        if(oldFinalize) oldFinalize.remove();
+        const oldLightning = document.getElementById('lightningSaveArea');
+        if(oldLightning) oldLightning.remove();
+
+        const btnDiv = document.createElement('div');
+        btnDiv.style.margin = "30px 0 10px 0";
+        if (settings.mode === 'regular') {
+            btnDiv.id = 'finalizeBtnArea';
+            btnDiv.innerHTML = `
+                <div style="background:#fff5f5; border:2px solid #ff8787; padding:15px; border-radius:12px; text-align:center;">
+                    <p style="margin:0 0 12px 0; font-weight:bold; color:#e03131;">📅 오늘 정모 성적을 최종 저장할까요?</p>
+                    <button class="universal-btn" style="background:#e03131; margin-bottom:0;" onclick="window.finalizeToRecords()">📥 정모 최종 저장 (에버 반영 + 히스토리 보관)</button>
+                </div>`;
+        } else {
+            btnDiv.id = 'lightningSaveArea';
+            btnDiv.innerHTML = `
+                <div style="background:#fff9db; border:2px solid #fab005; padding:15px; border-radius:12px; text-align:center;">
+                    <p style="margin:0 0 12px 0; font-weight:bold; color:#856404;">⚡ 오늘 번개 기록을 히스토리에 보관할까요?</p>
+                    <button class="universal-btn" style="background:#fab005; color:#000; margin-bottom:0;" onclick="window.saveLightningHistory()">📥 번개 기록 보관 (에버 미반영)</button>
+                </div>`;
+        }
+        totalRankArea.parentNode.insertBefore(btnDiv, totalRankArea);
+    }
+};
+
+window.activateSelectedEventDirect = function(id) {
+    const ev = events[id];
+    if(!ev) return;
+    if(confirm(`[${ev.date}] 모임 신청자 ${ev.attendees ? ev.attendees.length : 0}명으로 조편성을 시작할까요?`)) {
+        db.ref('bowling_v14').update({
+            'attendees': ev.attendees || [],
+            'settings/mode': ev.mode,
+            'settings/gameCount': ev.mode === 'lightning' ? 6 : 4,
+            'settings/currentTab': 'groupPanel'
+        }).then(() => {
+            alert("🎯 명단이 성공적으로 로드되었습니다!");
+            window.showPanel('groupPanel', document.querySelectorAll('.tab-btn')[1]);
+        });
+    }
+};
+
+window.toggleEventJoin = function(id) {
+    let list = (events[id] && events[id].attendees) ? [...events[id].attendees] : [];
+    if(list.includes(loggedInUser)) list = list.filter(n => n !== loggedInUser);
+    else list.push(loggedInUser);
+    db.ref('bowling_v14/events/' + id + '/attendees').set(list);
+};
+
+window.activateSelectedEvent = function() {
+    const id = document.getElementById('currentActiveEventId').value;
+    if(!id || !events[id]) return alert("진행할 모임을 먼저 선택해 주세요!");
+
+    if(confirm("이 명단으로 오늘 게임을 시작할까요?")) {
+        const ev = events[id];
+        const gCount = ev.mode === 'lightning' ? 6 : 4;
+
+        db.ref('bowling_v14').update({
+            'attendees': ev.attendees || [],
+            'settings/mode': ev.mode,
+            'settings/gameCount': gCount,
+            'settings/currentTab': 'groupPanel' 
+        }).then(() => {
+            alert("🎯 명단 로드 완료! 조편성 화면으로 이동합니다.");
+            const tabBtns = document.querySelectorAll('.tab-btn');
+            if (tabBtns[1]) {
+                window.showPanel('groupPanel', tabBtns[1]);
+            }
+        });
+    }
+};
+
+    window.changeAssignMethod = function(val) {
+        if(db) {
+            db.ref('bowling_v14/settings').update({ assignMethod: val })
+                .then(() => console.log("조편성 방식 변경 완료: " + val));
+        }
+    };
+    window.showPanel = function(id, btn) {
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        if(btn) btn.classList.add('active');
+
+        if(id !== 'inputPanel') currentInputTeam = null;
+
+        if(id === 'attendPanel') window.renderAttendanceList();
+        if(id === 'progressPanel') window.renderGameProgress();
+        if(id === 'statsPanel') window.renderAllStats(); 
+        if(id === 'inputPanel') {
+            if(loggedInUser) {
+                document.getElementById('scoreSection').style.display = 'block';
+                window.renderInputs(); 
+            } else {
+                document.getElementById('scoreSection').style.display = 'none';
+            }
+        }
+        if(id === 'memberPanel') window.renderMembers();
+    };
+
+    window.goToInput = function(gameNo, teamNo) { 
+        currentInputGame = gameNo;
+        currentInputTeam = teamNo; 
+        const tabBtns = document.querySelectorAll('.tab-btn');
+        const inputTabBtn = tabBtns[4]; 
+        window.showPanel('inputPanel', inputTabBtn); 
+    };
+    
+    window.clickInputTab = function(btn) {
+        currentInputTeam = null;
+        window.showPanel('inputPanel', btn);
+    };
+    
+    window.showAllTeams = function() {
+        currentInputTeam = null;
+        window.renderInputs();
+    };
+
+    window.renderInputs = function() {
+        const tabs = document.getElementById('inputTabs');
+        let tHtml = ''; 
+        for(let i=1; i<=settings.gameCount; i++) {
+            tHtml += `<div class="rank-tab ${currentInputGame===i?'active':''}" onclick="currentInputGame=${i};window.renderInputs()">${i}G</div>`;
+        }
+        tabs.innerHTML = tHtml;
+        document.getElementById('inputGameTitle').innerText = `${currentInputGame}G`;
+        
+        let gData = gameTeams[currentInputGame] || [];
+        
+        if(currentInputTeam) {
+            gData = gData.filter(t => t.teamNo == currentInputTeam);
+            document.getElementById('filterInfo').style.display = 'block';
+            document.getElementById('filterTeamName').innerText = `Team ${currentInputTeam}`;
+        } else {
+            document.getElementById('filterInfo').style.display = 'none';
+        }
+
+        const area = document.getElementById('inputGridArea');
+        if (!gData || gData.length === 0) {
+            area.innerHTML = '<div style="padding:40px; text-align:center; color:#999; border:2px dashed #ddd; border-radius:10px;">⚠️ 데이터가 없습니다.</div>';
+            return;
+        }
+
+        let h = '';
+        gData.forEach(t => {
+            h += `<div class="input-team-box"><div class="input-team-header">Team ${t.teamNo}</div>`;
+            t.members.forEach(m => {
+                const isG = m.name.includes("고스트") || m.isGhost;
+                const ghostStyle = isG ? 'background:#f1f3f5; color:#777; border:1px solid #ddd;' : '';
+                const readonlyAttr = isG ? 'readonly' : '';
+
+                h += `<div class="score-row">
+                    <span class="score-name">${m.name}</span>
+                    <input type="number" 
+                           inputmode="numeric" 
+                           pattern="[0-9]*" 
+                           class="score-input" 
+                           value="${m.score||0}" 
+                           ${readonlyAttr}
+                           style="${ghostStyle}"
+                           onfocus="this.select()"
+                           oninput="if(this.value.length > 3) this.value = this.value.slice(0, 3); if(this.value > 300) this.value = 300;"
+                           onchange="window.updateScore('${m.name}', this.value)">
+                </div>`;
+            });
+            h += `</div>`;
+        });
+        area.innerHTML = h;
+    };
+
+    window.setJungmoManager = function() {
+        const name = document.getElementById('jungmoJangInput').value.trim();
+        if(db) db.ref('bowling_v14/managers/jungmo').set(name).then(()=>alert("정모장 설정 완료"));
+    };
+    window.setBungaeManager = function() {
+        const name = document.getElementById('bungaeJangSelect').value;
+        if(!name) return alert("회원을 선택해주세요.");
+        if(db) db.ref('bowling_v14/managers/lightning').set(name).then(()=>alert("번개장 설정 완료"));
+    };
+
+    window.renderAssignGameTabs = function() {
+    const area = document.getElementById('assignGameTabs');
+    if(!area) return;
+
+    let html = '';
+    const count = (settings.mode === 'regular') ? 4 : (settings.gameCount || 6);
+    
+    for(let i=1; i<=count; i++) {
+        const isActive = (currentTargetGame === i) ? 'active' : '';
+        html += `<div class="rank-tab ${isActive}" style="flex:1; text-align:center;" onclick="window.setTargetGame(${i})">${i}G</div>`;
+    }
+    area.innerHTML = html;
+};
+
+window.setTargetGame = function(gameNo) {
+    currentTargetGame = gameNo;
+    window.renderAssignGameTabs();
+    if(window.renderCustomLaneConfig) window.renderCustomLaneConfig();
+    console.log(`${gameNo}G 조편성 모드로 전환!`);
+};
+
+    // ========================================================
+// 🏆 [ACE Golden Logic] 통합 배정 엔진 (AI & 랜덤 전용)
+// ========================================================
+// 1. 배정 로직 (황금 로직 적용 버전)
+window.runAssignment = function() {
+    if(selectedBlocks.length === 0 || attendees.length === 0) return alert("구역과 참석자를 확인하세요.");
+
+    const teamCount = selectedBlocks.length * 2;
+    const totalPeople = attendees.length;
+    const baseSize = Math.floor(totalPeople / teamCount);
+    const remainder = totalPeople % teamCount;
+
+    let women = [], men = [];
+    attendees.forEach(n => {
+        const s = window.getWeightedStats(n);
+        const m = members.find(x => x.name === n) || {gender:'남', handicap:0};
+        const p = { name: n, avg: s.weightedAvg, gender: m.gender, isGhost: false, handicap: m.handicap || 0, score: 0 };
+        if(p.gender === '여') women.push(p); else men.push(p);
+    });
+
+    let finalTeams = [];
+    for(let i=0; i<teamCount; i++) {
+        let cap = baseSize + (i < remainder ? 1 : 0);
+        finalTeams.push({ teamNo: i + 1, humanCap: cap, capacity: 5, members: [], totalAvg: 0 });
+    }
+
+    // 여성 균등 배치 후 남성 실력순 배치
+    women.sort((a,b)=>b.avg-a.avg).forEach((p, i) => { finalTeams[i % teamCount].members.push(p); finalTeams[i % teamCount].totalAvg += p.avg; });
+    men.sort((a,b)=>b.avg-a.avg).forEach(p => {
+        let targets = finalTeams.filter(t => t.members.length < t.humanCap);
+        targets.sort((a,b) => a.totalAvg - b.totalAvg);
+        if(targets.length > 0) { targets[0].members.push(p); targets[0].totalAvg += p.avg; }
+    });
+
+    // 부족한 인원 고스트 투입
+    finalTeams.forEach(t => {
+        while(t.members.length < t.capacity) t.members.push({ name: "👻고스트", avg: 0, gender: "남", isGhost: true, handicap: 0, score: 0 });
+    });
+
+    // 레인 좌3:우2 배치 및 매치핸디 계산
+    let lanePairs = [];
+    selectedBlocks.sort((a,b)=>a-b).forEach(z => { lanePairs.push([(z-1)*4+3, (z-1)*4+4], [(z-1)*4+5, (z-1)*4+6]); });
+    const maxAvg = Math.max(...finalTeams.map(t => t.totalAvg));
+
+    finalTeams.sort((a,b) => a.teamNo - b.teamNo).forEach((t, i) => {
+        const pair = lanePairs[i] || [0,0];
+        t.members.sort((a,b) => b.avg - a.avg);
+        t.members.forEach((m, idx) => { m.lane = (idx < 3) ? pair[0] : pair[1]; });
+        t.matchHandy = Math.max(0, Math.round(maxAvg - t.totalAvg));
+    });
+
+    gameTeams[currentTargetGame] = finalTeams;
+    db.ref('bowling_v14/gameTeams').set(gameTeams).then(() => {
+        alert(`✅ ${currentTargetGame}G 배정 완료!`);
+        currentRankView = currentTargetGame;
+        window.showPanel('progressPanel', document.querySelectorAll('.tab-btn')[3]); // 🚀 즉시 이동
+    });
+};
+
+// 2. 버튼 클릭 시 실제 실행되는 함수 (여기서 runAssignment를 부릅니다)
+window.runGeneralAssignment = function() {
+    if (gameTeams[currentTargetGame]) {
+        return alert(`⚠️ 이미 ${currentTargetGame}G 팀 배정이 완료되었습니다.`);
+    }
+
+    db.ref('bowling_v14/casino').once('value', sn => {
+        if (sn.exists()) {
+            alert("🎰 카지노 배정 진행 중입니다!");
+        } else {
+            window.runAssignment(); // 👈 여기서 위의 함수를 부릅니다.
+        }
+    });
+};
+window.startCasinoAssignment = function() {
+    if (gameTeams[currentTargetGame]) {
+        return alert(`⚠️ 이미 ${currentTargetGame}G 팀 배정이 완료되었습니다.\n새로 하시려면 [🗑️ 초기화]를 먼저 눌러주세요.`);
+    }
+
+    let teamList = [];
+    for(let k in laneSettings) if(k.startsWith('team_') && laneSettings[k] > 0) teamList.push(laneSettings[k]);
+    
+    if(teamList.length === 0) {
+        return alert("먼저 아래 [3. 레인별 인원 설정] 칸에 팀 번호를 입력해야 카지노 배정을 시작할 수 있습니다!");
+    }
+
+    if(confirm(`${currentTargetGame}G 카지노 배정을 시작할까요?\n확인 시 모든 참가자의 화면이 카지노로 이동합니다.`)) {
+        
+        db.ref('bowling_v14/settings').update({
+            currentTab: 'casinoPanel',
+            currentAssignGame: currentTargetGame 
+        });
+
+        const tabBtns = document.querySelectorAll('.tab-btn');
+        if(tabBtns[2]) window.showPanel('casinoPanel', tabBtns[2]);
+    }
+};
+
+window.renderStatsGameTabs = function() {
+    const area = document.getElementById('statsGameTabs');
+    if (!area) return;
+    let html = '';
+    const count = settings.gameCount || 4; 
+    for (let i = 1; i <= count; i++) {
+        const isActive = (currentStatsGame === i) ? 'active' : '';
+        html += `<div class="rank-tab ${isActive}" 
+                     style="flex:1; text-align:center; cursor:pointer;" 
+                     onclick="currentStatsGame=${i}; window.renderAllStats();">${i}G</div>`;
+    }
+    area.innerHTML = html;
+};
+window.renderCurrentGameStats = function() {
+    const teamArea = document.getElementById('currentTeamRankTable');
+    const indivArea = document.getElementById('currentIndivRankTable');
+    if (!teamArea || !indivArea) return;
+
+    const gData = gameTeams[currentStatsGame] || [];
+    if (gData.length === 0) {
+        teamArea.innerHTML = '<div style="padding:30px; text-align:center; color:#999;">입력된 점수가 없습니다.</div>';
+        indivArea.innerHTML = '';
+        return;
+    }
+
+    let teamRanks = gData.map(t => {
+        let sum = (parseInt(t.matchHandy) || 0);
+        t.members.forEach(m => {
+            const mInfo = members.find(x => x.name === m.name) || {};
+            sum += (parseInt(m.score) || 0) + (m.name.includes("고스트") ? 0 : (parseInt(mInfo.handicap) || 0));
+        });
+        return { teamNo: t.teamNo, total: sum, members: t.members.map(m=>m.name).join(', ') };
+    }).sort((a, b) => b.total - a.total);
+
+    teamArea.innerHTML = `
+        <table class="stats-table">
+            <thead><tr><th>순위</th><th>팀 (멤버)</th><th>총점</th></tr></thead>
+            <tbody>
+                ${teamRanks.map((tr, i) => `
+                    <tr>
+                        <td>${i === 0 ? '🥇' : i + 1}</td>
+                        <td style="text-align:left; padding-left:15px;">
+                            <b style="color:#2c3e50;">Team ${tr.teamNo}</b><br>
+                            <small style="color:#adb5bd;">[ ${tr.members} ]</small>
+                        </td>
+                        <td style="font-weight:bold; color:#3498db;">${tr.total}</td>
+                    </tr>`).join('')}
+            </tbody>
+        </table>`;
+
+    let indivMap = {};
+    const totalGameCount = settings.gameCount || 4; 
+
+    for (let g = 1; g <= totalGameCount; g++) {
+        const teams = gameTeams[g] || [];
+        teams.forEach(t => {
+            t.members.forEach(m => {
+                if (!indivMap[m.name]) {
+                    const mInfo = members.find(x => x.name === m.name) || { handicap: 0 };
+                    indivMap[m.name] = { 
+                        name: m.name, 
+                        scores: Array(totalGameCount).fill('-'), 
+                        accumulatedTotal: 0,
+                        gamesPlayed: 0,
+                        handicap: (m.name.includes("고스트") ? 0 : (parseInt(mInfo.handicap) || 0)),
+                        gender: mInfo.gender || '남'
+                    };
+                }
+                const s = parseInt(m.score) || 0;
+                if(s > 0) {
+                    indivMap[m.name].scores[g-1] = s;
+                    indivMap[m.name].accumulatedTotal += s;
+                    indivMap[m.name].gamesPlayed += 1;
+                }
+            });
+        });
+    }
+
+    const genderFilter = currentGenderFilter || 'all'; 
+
+let indivList = Object.values(indivMap)
+    .filter(p => genderFilter === 'all' || p.gender === genderFilter) 
+    .map(p => {
+        p.finalTotal = p.accumulatedTotal + (p.handicap * p.gamesPlayed);
+        return p;
+    }).sort((a, b) => b.finalTotal - a.finalTotal);
+
+    let gameHeaders = "";
+    for (let i = 1; i <= totalGameCount; i++) {
+        gameHeaders += `<th style="width:45px;">${i}G</th>`;
+    }
+
+    indivArea.innerHTML = `
+        <div style="overflow-x:auto;">
+            <table class="stats-table" style="margin-top:10px; min-width:350px;">
+                <thead>
+                    <tr>
+                        <th>순위</th>
+                        <th>이름</th>
+                        ${gameHeaders}
+                        <th style="background:#fff5f5; color:#e74c3c;">합계</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${indivList.map((p, i) => `
+                        <tr>
+                            <td>${i + 1}</td>
+                            <td style="font-weight:bold; white-space:nowrap;">${p.name}</td>
+                            ${p.scores.map((s, idx) => `
+                                <td style="${(s >= 200) ? 'color:#e74c3c; font-weight:bold;' : ((idx+1) === currentStatsGame ? 'color:#222;' : 'color:#adb5bd;')} ${(idx+1) === currentStatsGame ? 'background:#e7f5ff;' : ''}">
+    ${s}
+</td>
+                            `).join('')}
+                            <td style="color:#e74c3c; font-weight:bold; background:#fff5f5;">${p.finalTotal}</td>
+                        </tr>`).join('')}
+                </tbody>
+            </table>
+        </div>`;
+};
+
+window.renderHistoricalStats = function() {
+    const area = document.getElementById('historicalStatsTable');
+    if (!area || !loggedInUser) return;
+
+    if (!records || records.length === 0) {
+        area.innerHTML = '<div style="padding:30px; text-align:center; color:#999;">기록 데이터가 없습니다.</div>';
+        return;
+    }
+
+    let latestDateStr = records.reduce((max, r) => (r.date > max ? r.date : max), "1900-01-01");
+    let cutoff = new Date(latestDateStr); 
+
+    if (currentStatsPeriod === '1m') cutoff.setMonth(cutoff.getMonth() - 1);
+    else if (currentStatsPeriod === '3m') cutoff.setMonth(cutoff.getMonth() - 3);
+    else if (currentStatsPeriod === '6m') cutoff.setMonth(cutoff.getMonth() - 6);
+    else if (currentStatsPeriod === '12m') cutoff.setMonth(cutoff.getMonth() - 12);
+    else cutoff.setFullYear(1900);
+
+    let statsMap = {};
+    records.forEach(r => {
+        if (new Date(r.date) >= cutoff && r.scs) {
+            const name = (r.name || "").trim();
+            if (!name) return;
+            if (!statsMap[name]) statsMap[name] = { name: name, total: 0, count: 0 };
+            r.scs.forEach(s => {
+                if (parseInt(s) > 0) {
+                    statsMap[name].total += parseInt(s);
+                    statsMap[name].count++;
+                }
+            });
+        }
+    });
+
+    let statsList = Object.values(statsMap).map(s => ({
+        ...s,
+        avg: s.count > 0 ? Math.round(s.total / s.count) : 0
+    })).sort((a, b) => b.avg - a.avg);
+
+    let html = `
+        <div style="margin-bottom:10px; font-size:0.9rem; color:var(--accent); font-weight:bold; text-align:center; background:#f0f7ff; padding:10px; border-radius:8px; border:1px solid #d0e3ff;">
+            📊 통계 기준일: ${latestDateStr}
+        </div>
+        <table class="stats-table">
+            <thead><tr><th>순위</th><th>이름</th><th>게임수</th><th>총점</th><th>AVG</th></tr></thead>
+            <tbody>`;
+
+    html += statsList.map((s, i) => {
+        const avgClass = (s.avg >= 200) ? 'class="over-200"' : '';
+        return `
+            <tr>
+                <td>${i + 1}</td>
+                <td style="font-weight:bold;">${s.name}</td>
+                <td>${s.count}</td>
+                <td>${s.total}</td>
+                <td ${avgClass}>${s.avg}</td>
+            </tr>`;
+    }).join('');
+
+    area.innerHTML = html + `</tbody></table>`;
+};
+window.setStatsPeriod = function(period, btn) {
+    currentStatsPeriod = period;
+
+    const filterBtns = document.querySelectorAll('#statsPanel .filter-btn');
+    filterBtns.forEach(b => b.classList.remove('active')); 
+    if (btn) btn.classList.add('active'); 
+
+    console.log(`📅 통계 기간 변경: ${period}`);
+    window.renderAllStats(); 
+};
+window.renderTodayTotalRank = function() {
+    const totalArea = document.getElementById('todayTotalRankTable');
+    if (!totalArea) return;
+
+    let totalMap = {};
+    for (let i = 1; i <= settings.gameCount; i++) {
+        (gameTeams[i] || []).forEach(t => {
+            t.members.forEach(m => {
+                if (!totalMap[m.name]) totalMap[m.name] = { name: m.name, totalScore: 0, gameCount: 0 };
+                const s = parseInt(m.score) || 0;
+                if (s > 0) { totalMap[m.name].totalScore += s; totalMap[m.name].gameCount++; }
+            });
+        });
+    }
+
+    let totalList = Object.values(totalMap).sort((a, b) => b.totalScore - a.totalScore);
+
+    let totalHtml = `
+        <table class="stats-table" style="border: 2px solid var(--danger); margin-top: 10px;">
+            <thead style="background: #fff5f5;">
+                <tr><th>순위</th><th>이름</th><th>게임수</th><th>총점(합계)</th></tr>
+            </thead>
+            <tbody>`;
+
+    totalHtml += totalList.map((s, i) => {
+        const totalClass = (s.totalScore >= 200) ? 'class="over-200"' : '';
+        return `
+            <tr style="${i === 0 ? 'background: #fff9db; font-weight: bold;' : ''}">
+                <td>${i + 1}</td>
+                <td>${i === 0 ? '👑 ' : ''}${s.name}</td>
+                <td>${s.gameCount}G</td>
+                <td ${totalClass}>${s.totalScore}</td>
+            </tr>`;
+    }).join('');
+
+    totalArea.innerHTML = totalList.length ? (totalHtml + `</tbody></table>`) : '<div style="padding:20px; text-align:center; color:#999;">오늘 데이터가 없습니다.</div>';
+};
+        
+    window.saveSettings = function() {
+    const mode = document.getElementById('setMode') ? document.getElementById('setMode').value : settings.mode;
+    const cnt = document.getElementById('setGameCount') ? parseInt(document.getElementById('setGameCount').value) : settings.gameCount;
+    const avg = parseInt(document.getElementById('setAvgCriteria').value) || 6;
+    const method = document.getElementById('setAssignMethod').value;
+
+    if(db) {
+        db.ref('bowling_v14/settings').update({
+            mode: mode,
+            gameCount: cnt,
+            avgCriteria: avg,
+            assignMethod: method
+        }).then(() => {
+            const methodKOR = method === 'snake' ? '🐍 스네이크' : (method === 'ai' ? '🤖 AI 밸런스' : '🎲 랜덤');
+            
+            alert(`✅ 운영 설정 변경 완료!\n\n` +
+                  `📅 가중치 반영 기간: ${avg}개월\n` +
+                  `⚖️ 기본 조편성 방식: ${methodKOR}\n\n` +
+                  `[확인]을 누르면 설정이 즉시 적용됩니다.`);
+            
+            location.reload(); 
+        });
+    }
+};
+
+    window.toggleZone = function(n) {
+    if(selectedBlocks.includes(n)) {
+        selectedBlocks = selectedBlocks.filter(x => x !== n);
+    } else {
+        selectedBlocks.push(n);
+    }
+    
+    db.ref('bowling_v14/selectedBlocks').set(selectedBlocks);
+
+    for(let i=1; i<=5; i++) {
+        const b = document.getElementById('z'+i);
+        if(b) {
+            if(selectedBlocks.includes(i)) b.classList.add('selected');
+            else b.classList.remove('selected');
+        }
+    }
+    
+    window.renderCustomLaneConfig();
+};
+    window.renderCustomLaneConfig = function() {
+    const c = document.getElementById('laneConfigArea');
+    if(!c) return;
+    
+    let html = '';
+    if(selectedBlocks.length === 0) { 
+        c.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:30px; color:#999; border:2px dashed #ddd; border-radius:10px;">상단의 <b>[1. 구역 선택]</b> 버튼을 눌러주세요.</div>'; 
+        document.getElementById('totalConfigCount').innerText = '0'; 
+        return; 
+    }
+
+    selectedBlocks.sort((a,b)=>a-b).forEach(z => {
+        const s = (z-1)*4 + 3; 
+        [s, s+1, s+2, s+3].forEach(l => {
+            let valCnt = laneSettings['cnt_'+l] || 0; 
+            let valTeam = laneSettings['team_'+l] || 0;
+            
+            html += `
+            <div class="lane-box-v13">
+                <div class="lane-label" style="font-weight:bold; color:var(--purple);">${l}L</div>
+                
+                <input type="number" 
+                       inputmode="numeric" 
+                       class="lane-input" 
+                       placeholder="인원" 
+                       value="${valCnt > 0 ? valCnt : ''}" 
+                       onfocus="this.select()" 
+                       onchange="window.updateConfig('cnt_${l}', this.value)"
+                       style="width: 100%; text-align: center; border: 1px solid #ccc; border-radius: 4px; padding: 8px; margin-top:5px; font-size:1.1rem; box-sizing:border-box;">
+                
+                <input type="number" 
+                       inputmode="numeric" 
+                       class="lane-input" 
+                       placeholder="팀" 
+                       value="${valTeam > 0 ? valTeam : ''}" 
+                       onfocus="this.select()" 
+                       onchange="window.updateConfig('team_${l}', this.value)"
+                       style="width: 100%; text-align: center; border: 1px solid #ccc; border-radius: 4px; padding: 8px; margin-top:5px; font-size:1.1rem; background:#f9f9f9; box-sizing:border-box;">
+            </div>`;
+        });
+    });
+
+    c.innerHTML = html;
+    let t = 0; 
+    for(let k in laneSettings) if(k.startsWith('cnt_')) t += (parseInt(laneSettings[k]) || 0);
+    const totalArea = document.getElementById('totalConfigCount');
+    if(totalArea) totalArea.innerText = t;
+};
+window.applyPreset = function(size) {
+    if (selectedBlocks.length === 0) return alert("먼저 구역을 선택해주세요!");
+    if (attendees.length === 0) return alert("참석자가 없습니다.");
+
+    const total = attendees.length;
+    const teamCount = Math.ceil(total / size); 
+    let currentLaneIdx = 0;
+    let newSettings = {};
+
+    const lanes = [];
+    selectedBlocks.sort((a,b)=>a-b).forEach(z => {
+        const start = (z - 1) * 4 + 3;
+        for(let i=0; i<4; i++) lanes.push(start + i);
+    });
+
+    for (let t = 1; t <= teamCount; t++) {
+        for (let p = 0; p < size; p++) {
+            if (currentLaneIdx >= lanes.length) break;
+            const lane = lanes[currentLaneIdx];
+            newSettings['cnt_' + lane] = (newSettings['cnt_' + lane] || 0) + 1;
+            newSettings['team_' + lane] = t; 
+            currentLaneIdx++;
+        }
+    }
+
+    laneSettings = newSettings; 
+
+    db.ref('bowling_v14/laneSettings').set(newSettings).then(() => {
+        alert(`✅ ${size}인조 자동 설정 완료!\n총 ${teamCount}개 팀이 배정되었습니다.`);
+        window.renderCustomLaneConfig(); 
+    });
+};
+
+window.updateConfig = function(k, v) { 
+    laneSettings[k] = parseInt(v) || 0; 
+    
+    if(db) {
+        db.ref('bowling_v14/laneSettings').set(laneSettings)
+            .then(() => {
+                console.log("레인 설정 저장 완료");
+                window.renderCustomLaneConfig(); 
+            });
+    } else {
+        window.renderCustomLaneConfig(); 
+    }
+};
+    
+    // 1. [실력 계산] 공식 정모 12회 기준 3:7 가중치
+window.getWeightedStats = function(name) {
+    if (!name || name.includes("고스트")) return { weightedAvg: 0, simpleAvg12: 0 };
+    const allDates = [...new Set(records.map(r => r.date))].sort().reverse().slice(0, 12);
+    if (allDates.length === 0) return { weightedAvg: 0, simpleAvg12: 0 };
+    const recentWindow = allDates.slice(0, 6);
+    const pastWindow = allDates.slice(6, 12);
+    let recentScores = [], pastScores = [], totalScores12 = [];
+    records.filter(r => r.name === name && allDates.includes(r.date)).forEach(r => {
+        if(r.scs) r.scs.forEach(s => {
+            if (s > 0) {
+                totalScores12.push(s);
+                if (recentWindow.includes(r.date)) recentScores.push(s);
+                else if (pastWindow.includes(r.date)) pastScores.push(s);
+            }
+        });
+    });
+    const getAvg = (arr) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+    const simpleAvg12 = Math.round(getAvg(totalScores12));
+    const recentAvg = getAvg(recentScores);
+    const pastAvg = getAvg(pastScores);
+    let weightedAvg = (recentAvg > 0 && pastAvg > 0) ? Math.round((pastAvg * 0.3) + (recentAvg * 0.7)) : Math.round(recentAvg || pastAvg || simpleAvg12 || 0);
+    return { weightedAvg: weightedAvg || 0, simpleAvg12: simpleAvg12 || 0 };
+};
+
+// 2. [배정 엔진] 5인조 고정, 지그재그 레인, 자동 페이지 이동
+window.runAssignment = function() {
+    if(selectedBlocks.length === 0 || attendees.length === 0) return alert("구역과 참석자를 확인하세요.");
+    const teamCount = selectedBlocks.length * 2;
+    const totalPeople = attendees.length;
+    const baseSize = Math.floor(totalPeople / teamCount);
+    const remainder = totalPeople % teamCount;
+    let women = [], men = [];
+    attendees.forEach(n => {
+        const s = window.getWeightedStats(n);
+        const m = members.find(x => x.name === n) || {gender:'남', handicap:0};
+        const p = { name: n, avg: s.weightedAvg, gender: m.gender, isGhost: false, handicap: m.handicap || 0, score: 0 };
+        if(p.gender === '여') women.push(p); else men.push(p);
+    });
+    let finalTeams = [];
+    for(let i=0; i<teamCount; i++) {
+        let cap = baseSize + (i < remainder ? 1 : 0);
+        finalTeams.push({ teamNo: i + 1, humanCap: cap, capacity: 5, members: [], totalAvg: 0 });
+    }
+    women.sort((a,b)=>b.avg-a.avg).forEach((p, i) => { finalTeams[i % teamCount].members.push(p); finalTeams[i % teamCount].totalAvg += p.avg; });
+    men.sort((a,b)=>b.avg-a.avg).forEach(p => {
+        let targets = finalTeams.filter(t => t.members.length < t.humanCap);
+        targets.sort((a,b) => a.totalAvg - b.totalAvg);
+        if(targets.length > 0) { targets[0].members.push(p); targets[0].totalAvg += p.avg; }
+    });
+    finalTeams.forEach(t => { while(t.members.length < 5) t.members.push({ name: "👻고스트", avg: 0, gender: "남", isGhost: true, handicap: 0, score: 0 }); });
+    let lanePairs = [];
+    selectedBlocks.sort((a,b)=>a-b).forEach(z => { lanePairs.push([(z-1)*4+3, (z-1)*4+4], [(z-1)*4+5, (z-1)*4+6]); });
+    const maxAvg = Math.max(...finalTeams.map(t => t.totalAvg));
+    finalTeams.sort((a,b) => a.teamNo - b.teamNo).forEach((t, i) => {
+        const pair = lanePairs[i] || [0,0];
+        t.members.sort((a,b) => b.avg - a.avg);
+        t.members.forEach((m, idx) => { m.lane = (idx % 2 === 0) ? pair[0] : pair[1]; }); // 지그재그 배치
+        t.matchHandy = Math.max(0, Math.round(maxAvg - t.totalAvg));
+    });
+    gameTeams[currentTargetGame] = finalTeams;
+    db.ref('bowling_v14/gameTeams').set(gameTeams).then(() => {
+        alert(`✅ ${currentTargetGame}G 배정 완료!`);
+        currentRankView = currentTargetGame;
+        window.showPanel('progressPanel', document.querySelectorAll('.tab-btn')[3]); // 즉시 이동
+    });
+};
+
+// 3. [화면 출력] 가로 2열(좌3:우2), 화살표, 고스트 핸디 복구
+window.renderGameProgress = function() {
+    const tBox = document.getElementById('progTabs');
+    let tHtml = '';
+    for(let i=1; i<=settings.gameCount; i++) tHtml += `<div class="rank-tab ${currentRankView===i?'active':''}" onclick="currentRankView=${i};window.renderGameProgress()">${i}G</div>`;
+    tBox.innerHTML = tHtml;
+    const gData = gameTeams[currentRankView] || [];
+    const renderMem = (m, teamMatchHandy) => {
+        if(!m) return "";
+        const isG = m.name.includes("고스트");
+        const s = window.getWeightedStats(m.name);
+        const mInfo = members.find(x => x.name === m.name) || {};
+        const h = isG ? (parseInt(teamMatchHandy) || 0) : (parseInt(mInfo.handicap) || 0);
+        const total = (parseInt(m.score) || 0) + h;
+        let arrow = '';
+        if(!isG) {
+            if(s.weightedAvg > s.simpleAvg12) arrow = '<span style="color:red;">▲</span>';
+            else if(s.weightedAvg < s.simpleAvg12) arrow = '<span style="color:blue;">▼</span>';
+            else arrow = '<span style="color:#999;">-</span>';
+        }
+        return `
+            <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #f1f1f1; align-items:center;">
+                <div style="line-height:1.2;">
+                    <b style="font-size:1.05rem;">${m.name}</b><br>
+                    <small style="color:#666;">${!isG ? `(${s.simpleAvg12 || 0}) <b>${s.weightedAvg || 0}</b> ${arrow}` : '고스트'} <b style="color:#8e44ad; margin-left:4px;">H:${h}</b></small>
+                </div>
+                <div style="font-size:1.15rem; font-weight:bold;">${total}</div>
+            </div>`;
+    };
+    const cardsHtml = gData.map(t => {
+        let teamSum = (parseInt(t.matchHandy) || 0);
+        t.members.forEach(m => teamSum += (parseInt(m.score) || 0) + (m.name.includes("고스트") ? 0 : (parseInt(members.find(x=>x.name===m.name)?.handicap) || 0)));
+        const L = [t.members[0], t.members[2], t.members[4]]; // 1, 3, 5위
+        const R = [t.members[1], t.members[3]]; // 2, 4위
+        return `
+            <div class="team-card" style="margin-bottom:20px; border:2px solid #6c5ce7; border-radius:12px; overflow:hidden; background:white;">
+                <div class="team-header" onclick="window.goToInput(${currentRankView}, ${t.teamNo})" style="background:#6c5ce7; color:white; padding:10px 15px; display:flex; justify-content:space-between; align-items:center;">
+                    <b>Team ${t.teamNo} <small>(에버합:${t.totalAvg})</small></b>
+                    <span style="background:white; color:#6c5ce7; padding:2px 10px; border-radius:15px; font-weight:bold;">총점: ${teamSum}</span>
+                </div>
+                <div style="display: flex;">
+                    <div style="flex: 1.1; border-right: 1px dashed #ddd; padding: 10px;">
+                        <div style="text-align:center; font-weight:bold; color:#3498db; font-size:0.8rem; background:#f0f8ff; border-radius:4px; margin-bottom:5px;">${L[0]?.lane || '?'}L (좌)</div>
+                        ${L.map(m => renderMem(m, t.matchHandy)).join('')}
+                    </div>
+                    <div style="flex: 1; padding: 10px;">
+                        <div style="text-align:center; font-weight:bold; color:#e67e22; font-size:0.8rem; background:#fff5eb; border-radius:4px; margin-bottom:5px;">${R[0]?.lane || '?'}L (우)</div>
+                        ${R.map(m => renderMem(m, t.matchHandy)).join('')}
+                    </div>
+                </div>
+                ${t.matchHandy > 0 ? `<div style="font-size:0.75rem; color:#8e44ad; padding:4px; text-align:center; background:#f3f0ff; border-top:1px solid #eee; font-weight:bold;">🛡️ 매치 핸디 보너스 +${t.matchHandy}</div>` : ''}
+            </div>`;
+    }).join('') || '<div style="text-align:center; padding:50px; color:#999;">데이터 없음</div>';
+    document.getElementById('teamCardArea').innerHTML = cardsHtml;
+};
+
+    window.updateScore = function(n, v) { (gameTeams[currentInputGame]||[]).forEach(t => t.members.forEach(m => { if(m.name===n) m.score = parseInt(v); })); };
+    
+window.saveAllScores = function() { 
+    db.ref('bowling_v14/gameTeams').set(gameTeams).then(() => {
+        
+        currentStatsGame = currentInputGame; 
+
+        db.ref('bowling_v14/settings').update({ 
+            currentTab: 'statsPanel',
+            currentStatsGame: currentInputGame 
+        });
+
+        alert(`✅ ${currentInputGame}G 점수 저장 완료! 실시간 통계 화면으로 이동합니다.`);
+        
+        const tabBtns = document.querySelectorAll('.tab-btn');
+        if(tabBtns[5]) {
+            window.showPanel('statsPanel', tabBtns[5]);
+        }
+
+    }).catch(err => {
+        alert("저장 중 오류 발생: " + err);
+    });
+};
+
+window.filterCurrentStats = function(gender, btn) {
+    currentGenderFilter = gender;
+    document.querySelectorAll('#statsPanel .filter-btn').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    window.renderCurrentGameStats();
+};
+window.deleteEvent = function(id) {
+    if (confirm("⚠️ 이 모임 공지를 삭제할까요?\n신청 명단도 모두 사라집니다.")) {
+        db.ref('bowling_v14/events/' + id).remove()
+        .then(() => alert("✅ 삭제되었습니다."))
+        .catch(err => alert("❌ 삭제 실패: " + err));
+    }
+};
+window.kickMember = function(eventId, userName) {
+    if(!confirm(`[${userName}] 님을 명단에서 제외할까요?`)) return;
+    
+    const ev = events[eventId];
+    if(!ev || !ev.attendees) return;
+    
+    const newList = ev.attendees.filter(n => n !== userName);
+    
+    db.ref(`bowling_v14/events/${eventId}/attendees`).set(newList)
+      .then(() => alert(`${userName} 님이 제외되었습니다.`));
+};  
+ window.logout = function() { localStorage.clear(); location.reload(); };
+    window.checkGender = function(sel) {
+        document.getElementById('newMemHandicap').value = (sel.value === '여' ? 12 : 0);
+    };
+
+    window.addMember = function() {
+        const nameInput = document.getElementById('newMemName');
+        const genderInput = document.getElementById('newMemGender');
+        const handicapInput = document.getElementById('newMemHandicap');
+        const name = nameInput.value.trim();
+        const gender = genderInput.value;
+        const handicap = parseInt(handicapInput.value) || 0;
+        if(!name) return alert("이름 입력!");
+        db.ref('bowling_v14/members').push({ name: name, gender: gender, handicap: handicap, pw: '1234' }).then(() => location.reload());
+    };
+    
+    window.renderAttendanceList = function() {
+    const a = document.getElementById('attendListArea');
+    if(!a) return;
+    const sorted = members.filter(m => m.status !== '탈퇴').sort((a,b) => a.name.localeCompare(b.name));
+    a.innerHTML = sorted.map(m => {
+        const is = attendees.includes(m.name); 
+            const nameStyle = is ? 'color:var(--green); font-weight:bold; font-size:1.2rem;' : 'color:#333; font-size:1.2rem;';
+        const btnStyle = is ? 'background:var(--green); color:white; border-color:var(--green);' : 'background:#fff; color:#333; border-color:#ddd;';
+        
+        return `<div class="member-row" style="padding:12px;">
+            <span style="${nameStyle}">${m.name}</span>
+            <button class="btn-sm" style="${btnStyle}" onclick="window.toggleAtt('${m.name}')">${is?'참석중':'참석'}</button>
+        </div>`;
+           }).join('');
+        if(document.getElementById('attCount')) document.getElementById('attCount').innerText = attendees.length;
+    };
+
+    
+// ========================================================
+// 🟡 [수정] 이벤트 참석 신청 (관리자 대리 신청 기능 추가)
+// ========================================================
+window.toggleEventJoin = function(id, userName) {
+    // userName이 인자로 들어오면 그 이름을 쓰고, 없으면 로그인한 본인 이름을 씁니다.
+    const targetName = (userName || loggedInUser || "").trim();
+    
+    if(!targetName) return alert("회원 이름을 선택해주세요.");
+
+    // 관리자가 아닌데 다른 사람을 추가하려고 하면 막습니다.
+    if (!isAdmin && targetName !== loggedInUser) {
+        return alert("🚫 본인만 신청 가능합니다.");
+    }
+
+    let list = (events[id] && events[id].attendees) ? [...events[id].attendees] : [];
+    
+    if(list.includes(targetName)) {
+        // 이미 있으면 명단에서 제거
+        list = list.filter(n => n !== targetName);
+    } else {
+        // 없으면 명단에 추가
+        list.push(targetName);
+    }
+    
+    db.ref('bowling_v14/events/' + id + '/attendees').set(list).then(() => {
+        if(userName) alert(`✅ ${targetName} 님 처리 완료!`);
+    });
+};
+
+    
+
+    window.deleteMember = function(key) { if(confirm("삭제?")) db.ref('bowling_v14/members/' + key).remove(); };
+    window.deleteAllData = function() { if(confirm("초기화?")) db.ref('bowling_v14').remove().then(() => location.reload()); };
+    window.resetAttendance = function() { if(confirm("초기화?")) db.ref('bowling_v14/attendees').set([]); };
+    window.closeModal = function() { document.getElementById('modalOverlay').style.display='none'; };
+    window.showAttendeePopup = function() { document.getElementById('modalOverlay').style.display='flex'; document.getElementById('modalTitle').innerText = `참석자 (${attendees.length}명)`; document.getElementById('modalContent').innerHTML = attendees.join(', '); };
+    window.toggleMode = function() {
+    
+    const nextMode = settings.mode === 'regular' ? 'lightning' : 'regular';
+    
+    const nextGameCount = (nextMode === 'lightning') ? 6 : 4;
+
+    db.ref('bowling_v14/settings').update({ 
+        mode: nextMode, 
+        gameCount: nextGameCount, 
+        currentTab: 'groupPanel'
+    }).then(() => {
+        const modeName = nextMode === 'lightning' ? '⚡번개(6G)' : '⚖️정기(4G)';
+        alert(`${modeName} 모드로 전환되었습니다!`);
+    });
+};
+    window.resetAssignment = function() {
+    const myName = (loggedInUser || "").trim();
+    const isBoss = isAdmin || (managers.jungmo === myName) || (managers.lightning === myName);
+
+    if (!isBoss) {
+        return alert("🚫 초기화 권한이 없습니다.");
+    }
+
+    const gIdx = currentTargetGame; 
+    if (confirm(`⚠️ [정밀 초기화] 현재 진행 중인 [${gIdx}G] 데이터와 번개장 설정을 초기화할까요?`)) {
+        
+        let updates = {};
+        updates[`bowling_v14/gameTeams/${gIdx}`] = null;
+        updates['bowling_v14/casino'] = null;
+        updates['bowling_v14/managers/lightning'] = ''; 
+
+        db.ref().update(updates).then(() => {
+            if(gameTeams[gIdx]) delete gameTeams[gIdx];
+            alert(`✅ ${gIdx}G 데이터 및 번개장 설정이 초기화되었습니다.`);
+            
+            if(window.renderCustomLaneConfig) window.renderCustomLaneConfig();
+            if(window.renderAssignGameTabs) window.renderAssignGameTabs();
+            if(window.updateUI) window.updateUI(); 
+        });
+    }
+};
+    window.saveHistory = function() { if(!gameTeams[currentRankView]) return; const h = { date: new Date().toISOString().split('T')[0], game: currentRankView, teams: gameTeams[currentRankView] }; db.ref('bowling_v14/history').push(h).then(() => alert("저장됨")); };
+    
+ window.viewHistory = function() { db.ref('bowling_v14/history').limitToLast(5).once('value', sn => { const val = sn.val(); if(!val) return alert("기록없음"); let msg = "📜 최근기록\n"; Object.values(val).reverse().forEach(h => msg += `[${h.date} ${h.game}G]\n`); alert(msg); }); };
+    
+window.exportData = function() {
+    if(!confirm("현재의 모든 데이터를 JSON 파일로 백업하시겠습니까?")) return;
+
+    db.ref('bowling_v14').once('value', sn => {
+        const data = sn.val();
+        if(!data) return alert("내보낼 데이터가 없습니다.");
+
+        const fileName = `AceBowling_Backup_${new Date().toISOString().split('T')[0]}.json`;
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        alert("✅ 백업 파일(JSON)이 다운로드 폴더에 저장되었습니다.");
+    });
+};
+
+window.importData = function(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (!confirm("⚠️ 주의: 이 파일을 불러오면 현재의 모든 데이터가 삭제되고 파일 내용으로 덮어씌워집니다.\n정말로 진행하시겠습니까?")) {
+        event.target.value = ''; 
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const importedData = JSON.parse(e.target.result);
+            
+            if(!importedData.members && !importedData.records) {
+                throw new Error("올바른 에이스 볼링 백업 파일이 아닙니다.");
+            }
+
+            db.ref('bowling_v14').set(importedData).then(() => {
+                alert("🎉 데이터 복구 성공! 앱을 새로고침합니다.");
+                location.reload();
+            });
+        } catch (err) {
+            alert("❌ JSON 읽기 실패: 파일이 손상되었거나 형식이 맞지 않습니다.\n(에러내용: " + err.message + ")");
+        }
+    };
+    reader.readAsText(file);
+};;
+window.downloadExcel = function() {
+    db.ref('bowling_v14/records').once('value', (snapshot) => {
+        const records = snapshot.val();
+        if (!records) return alert("내보낼 데이터가 없습니다.");
+
+        const allDates = [...new Set(Object.values(records).map(r => r.date))].sort();
+        const allNames = [...new Set(Object.values(records).map(r => r.name))].sort();
+
+        const header1 = ["이름", "평균", "합계"];
+        const header2 = ["", "", ""];
+        
+        allDates.forEach(date => {
+            header1.push(date, "", "", ""); 
+            header2.push("1G", "2G", "3G", "4G");
+        });
+
+        const excelRows = [header1, header2];
+
+        allNames.forEach(name => {
+            const row = [name];
+            let totalSum = 0;
+            let totalGames = 0;
+            const scoreCells = [];
+
+            allDates.forEach(date => {
+                const key = `${date}_${name.replace(/[.#$/[\]]/g, "_")}`;
+                const rec = records[key];
+                
+                if (rec && rec.scs) {
+                    const scs = rec.scs;
+                    scoreCells.push(scs[0] || "", scs[1] || "", scs[2] || "", scs[3] || "");
+                    totalSum += scs.reduce((a, b) => a + (parseInt(b) || 0), 0);
+                    totalGames += scs.length;
+                } else {
+                    scoreCells.push("", "", "", ""); 
+                }
+            });
+
+            const avg = totalGames > 0 ? (totalSum / totalGames).toFixed(1) : 0;
+            row.push(avg, totalSum, ...scoreCells);
+            excelRows.push(row);
+        });
+
+        const worksheet = XLSX.utils.aoa_to_sheet(excelRows);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "전체기록");
+
+        const dateStr = new Date().toISOString().split('T')[0];
+        XLSX.writeFile(workbook, `에이스볼링_장부_${dateStr}.xlsx`);
+    });
+};
+window.deleteToday = function() {
+    if (confirm("⚠️ [주의] 오늘 생성된 1~6G 조편성과 점수를 모두 삭제하시겠습니까?\n(회원 명단과 가중치 설정은 안전하게 유지됩니다.)")) {
+        
+        const check = prompt("정말 삭제하시려면 '삭제'라고 정확히 입력해 주세요.");
+        
+        if (check === "삭제") {
+            db.ref('bowling_v14/gameTeams').remove()
+                .then(() => {
+                    alert("✅ 오늘의 모든 게임 기록(1~6G)이 깔끔하게 삭제되었습니다.");
+                    location.reload(); 
+                })
+                .catch(err => alert("❌ 삭제 중 오류 발생: " + err));
+        } else {
+            alert("❌ 입력이 틀렸습니다. 삭제를 취소합니다.");
+        }
+    }
+};
+
+    window.deleteAllData = function() {
+        if (confirm("🚨 [경고] 회원 명단, 모든 과거 기록, 설정이 통째로 날아갑니다!")) {
+            const check = prompt("데이터를 완전히 초기화하려면 '삭제'라고 정확히 입력해 주세요.");
+            if (check === "삭제") {
+                db.ref('bowling_v14').remove()
+                    .then(() => {
+                        alert("💥 모든 데이터가 초기화되었습니다. 앱을 처음부터 다시 시작합니다.");
+                        location.reload();
+                    })
+                    .catch(err => alert("❌ 초기화 오류: " + err));
+            } else {
+                alert("입력이 틀렸습니다. 삭제를 취소합니다.");
+            }
+        }
+    };
+
+    window.resetAttendance = function() {
+        if (confirm("🔄 현재 참석 체크된 인원들을 모두 해제하시겠습니까?")) {
+            db.ref('bowling_v14/attendees').set([])
+                .then(() => {
+                    alert("✅ 참석 명단이 초기화되었습니다.");
+                    if(window.renderAttendanceList) window.renderAttendanceList();
+                })
+                .catch(err => alert("❌ 초기화 중 오류: " + err));
+        }
+    };
+
+    
+    window.uploadExcel = function() {
+        alert("엑셀 일괄 등록 기능은 현재 개발 준비 중입니다.");
+    };
+window.getMyTier = function() {
+    const myName = (loggedInUser || "").trim();
+    if(!myName || !attendees.length) return null;
+    
+    const rankingList = attendees
+        .filter(n => !n.includes("고스트")) 
+        .map(name => {
+            const stats = window.getWeightedStats(name);
+            return { 
+                name: name.trim(), 
+                avg: parseFloat(stats.weightedAvg) || 0 
+            };
+        });
+
+    rankingList.sort((a, b) => b.avg - a.avg);
+
+    const myRank = rankingList.findIndex(player => player.name === myName);
+    if(myRank === -1) return null;
+
+    let teamList = [];
+    for(let k in laneSettings) {
+        if(k.startsWith('team_') && parseInt(laneSettings[k]) > 0) {
+            teamList.push(parseInt(laneSettings[k]));
+        }
+    }
+    
+    const T = [...new Set(teamList)].length || (selectedBlocks.length * 2) || 2;
+
+    if(myRank < T) return 'red';          
+    if(myRank < T * 2) return 'blue';      
+    if(myRank < T * 3) return 'green';     
+    return 'yellow';                       
+};
+
+window.initCasino = function() {
+    const myName = (loggedInUser || "").trim();
+    if(!isAdmin && managers.jungmo !== myName) return alert("🚫 권한이 없습니다.");
+    if(!attendees || attendees.length === 0) return alert("참석자를 먼저 체크해주세요.");
+
+    let teamPools = {}; 
+    let totalSeatCount = 0;
+
+    selectedBlocks.forEach(z => {
+        const start = (z - 1) * 4 + 3;
+        for(let l = start; l < start + 4; l++) {
+            let count = parseInt(laneSettings['cnt_' + l]) || 0;
+            let teamNum = parseInt(laneSettings['team_' + l]) || 0;
+            
+            if(count > 0 && teamNum > 0) {
+                if(!teamPools[teamNum]) teamPools[teamNum] = [];
+                for(let i = 0; i < count; i++) {
+                    teamPools[teamNum].push(l); 
+                    totalSeatCount++;
+                }
+            }
+        }
+    });
+
+    const uniqueTeamNos = Object.keys(teamPools).sort((a,b) => a-b);
+    const T = uniqueTeamNos.length; 
+
+    if(T === 0) return alert("🚩 조편성 하단에 '팀 번호'를 입력해야 합니다! (예: 1, 2)");
+
+    let casinoState = { settings: { status: 'open', totalSlots: totalSeatCount }, red: {}, blue: {}, green: {}, yellow: {} };
+    const tiers = ['red', 'blue', 'green', 'yellow'];
+
+    uniqueTeamNos.forEach(tNo => teamPools[tNo].sort(() => Math.random() - 0.5));
+
+    for(let round = 0; round < 4; round++) {
+        const currentTier = tiers[round];
+        let tierLanes = []; 
+
+        uniqueTeamNos.forEach((tNo) => {
+            if(teamPools[tNo] && teamPools[tNo].length > 0) {
+                tierLanes.push(teamPools[tNo].shift());
+            }
+        });
+
+        tierLanes.sort(() => Math.random() - 0.5);
+
+        tierLanes.forEach((laneNum, idx) => {
+            casinoState[currentTier][idx + 1] = {
+                status: 'idle',
+                owner: '',
+                lane: laneNum
+            };
+        });
+    }
+
+    db.ref('bowling_v14/casino').set(casinoState).then(() => {
+        alert(`🎰 등급별 칩 생성 완료! (총 ${T}개 팀 기준)`);
+    });
+};
+window.renderCasino = function() {
+    db.ref('bowling_v14/casino').once('value', sn => {
+        const data = sn.val() || {};
+        ['red', 'blue', 'green', 'yellow'].forEach(tier => {
+            const container = document.getElementById('chips_' + tier);
+            const zone = document.getElementById('zone_' + tier);
+            if (!container) return;
+
+            const chips = data[tier] || {};
+            const chipKeys = Object.keys(chips);
+
+            if (zone) zone.style.display = (chipKeys.length > 0) ? 'block' : 'none';
+            container.innerHTML = ''; 
+
+            chipKeys.forEach(id => {
+                const c = chips[id];
+                const isPicked = c.status === 'picked';
+                
+                const div = document.createElement('div');
+                div.className = `chip ${tier} ${isPicked ? 'selected' : ''}`;
+                div.onclick = () => { if(!isPicked) window.pickChip(tier, id); };
+                
+                div.innerHTML = `
+                    <div class="chip-inner">
+                        <div class="chip-num" style="font-size: 1.3rem; font-weight: 900; color: #333;">
+                            ${isPicked ? c.lane + 'L' : ''} 
+                        </div>
+                        <div class="chip-owner" style="color:var(--danger); font-size:11px; font-weight:bold; margin-top:2px;">
+                            ${isPicked ? c.owner : ''}
+                        </div>
+                    </div>`;
+                container.appendChild(div);
+            });
+        });
+    });
+};
+window.pickChip = function(tier, id) {
+    const myTier = window.getMyTier(); 
+    const myName = (loggedInUser || "").trim();
+    const isBoss = isAdmin || (managers.jungmo === myName) || (managers.lightning === myName);
+
+    db.ref('bowling_v14/casino').once('value', sn => {
+        const data = sn.val() || {};
+        
+        if (!isBoss) {
+            if (!myTier) return alert("🚫 참석 명단에 이름이 없습니다.");
+            if (tier !== myTier) return alert(`⚖️ 회원님은 [${myTier.toUpperCase()}] 등급 칩만 선택 가능합니다.`);
+        }
+
+        let alreadyPicked = false;
+        ['red', 'blue', 'green', 'yellow', 'purple'].forEach(t => {
+            if(data[t]) {
+                Object.values(data[t]).forEach(c => {
+                    if(c.owner === myName) alreadyPicked = true;
+                });
+            }
+        });
+
+        if(alreadyPicked) return alert("🚫 이미 칩을 뽑으셨습니다!");
+
+        const chipRef = db.ref(`bowling_v14/casino/${tier}/${id}`);
+        chipRef.transaction(current => {
+            if(current && current.status === 'idle') {
+                return { ...current, status: 'picked', owner: myName };
+            }
+            return;
+        }, (err, committed) => {
+            if(!committed) alert("⚠️ 이미 다른 분이 선택했거나 오류가 발생했습니다.");
+        });
+    }); 
+}; 
+
+window.finishCasino = function() {
+    const myName = (loggedInUser || "").trim();
+    const isBoss = isAdmin || (managers.jungmo === myName) || (managers.lightning === myName);
+    if (!isBoss) return alert("🚫 권한이 없습니다.");
+
+    if (!confirm("배정을 종료하고 진행 페이지로 이동할까요?")) return;
+
+    db.ref('bowling_v14/casino').once('value', sn => {
+        const data = sn.val() || {};
+        if (!data) return;
+
+        let pickedOwners = [];
+        ['red', 'blue', 'green', 'yellow', 'purple'].forEach(t => {
+            if(data[t]) {
+                Object.values(data[t]).forEach(c => {
+                    if(c.status === 'picked') pickedOwners.push(c.owner);
+                });
+            }
+        });
+
+        let unpickedPeople = attendees.filter(name => !pickedOwners.includes(name));
+        let finalTeamsMap = {}; 
+        
+        ['red', 'blue', 'green', 'yellow', 'purple'].forEach(tier => {
+            if(!data[tier]) return;
+            Object.values(data[tier]).forEach(c => {
+                const teamNum = parseInt(laneSettings['team_' + c.lane]);
+                if(!teamNum) return;
+                
+                if(!finalTeamsMap[teamNum]) {
+                    finalTeamsMap[teamNum] = { teamNo: teamNum, members: [], totalAvg: 0, matchHandy: 0 };
+                }
+
+                let isPicked = (c.status === 'picked');
+                let memberName = isPicked ? c.owner : (unpickedPeople.length > 0 ? unpickedPeople.shift() : "👻고스트");
+                
+                let stats = window.getWeightedStats(memberName);
+                let mInfo = members.find(x => x.name === memberName.trim()) || { handicap: 0 };
+                let weightedAvg = memberName.includes("고스트") ? 0 : stats.weightedAvg;
+
+                finalTeamsMap[teamNum].members.push({
+                    name: memberName,
+                    lane: c.lane,
+                    avg: weightedAvg,
+                    handy: parseInt(mInfo.handicap) || 0,
+                    score: 0,
+                    isGhost: memberName.includes("고스트")
+                });
+                finalTeamsMap[teamNum].totalAvg += weightedAvg;
+            });
+        });
+
+        const teamArr = Object.values(finalTeamsMap).sort((a,b) => a.teamNo - b.teamNo);
+        const maxAvg = Math.max(...teamArr.map(t => t.totalAvg)); 
+        teamArr.forEach(t => {
+            t.matchHandy = (t.totalAvg < maxAvg) ? Math.round(maxAvg - t.totalAvg) : 0;
+        });
+              
+        db.ref(`bowling_v14/gameTeams/${currentTargetGame}`).set(teamArr).then(() => {
+            db.ref('bowling_v14/settings').update({
+                currentTab: 'progressPanel',
+                currentRankView: currentTargetGame,
+                currentInputGame: currentTargetGame
+            });
+            alert(`✅ ${currentTargetGame}G 배정 완료!`);
+            db.ref('bowling_v14/casino').set(null);
+        });
+    }); 
+}; 
+
+window.nextCnt = function(lane, current) {
+    let next = 0;
+    if (current === 0) next = 2;
+    else if (current === 2) next = 3;
+    else if (current === 3) next = 4;
+    else next = 0;
+    
+    window.updateConfig('cnt_' + lane, next);
+};
+
+window.nextTeam = function(lane, current) {
+    let next = (current >= 8) ? 0 : current + 1;
+    window.updateConfig('team_' + lane, next);
+};
+    const now = new Date();
+const offset = now.getTimezoneOffset() * 60000;
+const finalToday = new Date(now.getTime() - offset).toISOString().split('T')[0];
+    if(document.getElementById('progDate')) document.getElementById('progDate').value = finalToday;
+    if(document.getElementById('inputDate')) document.getElementById('inputDate').value = finalToday;
+
+(function() {
+    const el = document.getElementById('excelInput');
+    if (!el) return;
+
+    el.onclick = function() { this.value = null; };
+
+    el.onchange = function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        alert("📊 파일을 읽고 분석하는 중입니다. 잠시만 기다려주세요...");
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+                if (rows.length < 2) return alert("❌ 데이터가 부족합니다.");
+
+                const headers = rows[0];
+                const dataRows = rows.slice(1);
+                
+                let lastDate = "";
+                const dateMap = headers.map((h, i) => {
+                    if (i < 3) return null; 
+                    if (h) {
+                        let d = h.toString().split('.')[0].trim();
+                        if(d.length === 8) d = `${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}`;
+                        lastDate = d;
+                    }
+                    return lastDate;
+                });
+
+                let promises = []; 
+                let memCnt = 0;
+
+                dataRows.forEach((row) => {
+                    const name = (row[2] || "").toString().trim();
+                    if (!name || name === "이름") return;
+
+                    if (!members.some(m => m.name === name)) {
+                        promises.push(db.ref('bowling_v14/members').push({ name, gender: '남', handicap: 0, pw: '1234' }));
+                        memCnt++;
+                    }
+
+                    let dayScores = {};
+                    dateMap.forEach((date, idx) => {
+                        if (!date) return;
+                        const s = parseInt(row[idx]);
+                        if (!isNaN(s) && s > 0) {
+                            if (!dayScores[date]) dayScores[date] = [];
+                            dayScores[date].push(s);
+                        }
+                    });
+
+                    Object.keys(dayScores).forEach(date => {
+                        const key = `${date}_${name.replace(/[.#$/[\]]/g, "_")}`;
+                        promises.push(db.ref(`bowling_v14/records/${key}`).set({ 
+                            date: date, name: name, scs: dayScores[date] 
+                        }));
+                    });
+                });
+
+                Promise.all(promises).then(() => {
+                    alert(`✅ 업로드 완료!\n- 신규 등록: ${memCnt}명\n- 총 ${promises.length}건의 기록이 안전하게 저장되었습니다.`);
+                    location.reload();
+                }).catch(err => {
+                    alert("❌ 저장 중 오류 발생: " + err.message);
+                });
+
+            } catch (err) {
+                alert("❌ 엑셀 판독 에러: " + err.message);
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    };
+})();
+
+window.updateMember = function(key, name, currentHandy, currentGender) {
+    const newGender = prompt(`${name}님의 성별을 입력하세요 (남/여):`, currentGender || '남');
+    if (newGender === null) return;
+
+    const newHandy = prompt(`${name}님의 새로운 핸디캡을 입력하세요:`, currentHandy);
+    if (newHandy === null) return;
+
+    db.ref('bowling_v14/members/' + key).update({ 
+        gender: newGender, 
+        handicap: parseInt(newHandy) || 0 
+    }).then(() => alert("✅ 정보 수정이 완료되었습니다."));
+};
+
+window.updatePw = function(key, name, currentPw) {
+    const newPw = prompt(`${name}님의 새로운 비밀번호를 입력하세요:`, currentPw);
+    if (newPw) {
+        db.ref('bowling_v14/members/' + key).update({ pw: newPw })
+          .then(() => alert("✅ 비밀번호가 변경되었습니다."));
+    }
+};
+
+window.deleteMember = function(key, name) {
+    if(confirm(`🚨 [${name}] 회원을 정말로 삭제하시겠습니까?\n모든 기록이 사라지며 복구할 수 없습니다.`)) {
+        db.ref('bowling_v14/members/' + key).remove()
+          .then(() => alert("🗑️ 삭제가 완료되었습니다."));
+    }
+};
+
+window.renderMembers = function() { 
+    const area = document.getElementById('memberListArea'); 
+    if(!area) return; 
+
+    if(!members || members.length === 0) {
+        area.innerHTML = '<div style="padding:20px; text-align:center; color:#999;">회원 데이터를 불러오는 중입니다...</div>';
+        return;
+    }
+
+    area.innerHTML = members.sort((a,b)=>a.name.localeCompare(b.name)).map(m => `
+        <div class="member-row" style="padding: 15px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;">
+            <div style="display:flex; flex-direction:column;">
+                <b style="font-size:1.2rem; color:#333;">${m.name}</b>
+                <span style="font-size:0.9rem; color:#666;">
+                    ${m.gender || '남'} / <span style="color:var(--purple); font-weight:bold;">H:${m.handicap || 0}</span>
+                </span>
+            </div>
+            <div style="display:flex; gap:8px;">
+                <button class="btn-sm" style="background:var(--accent); color:white; border:none; padding:8px 12px; border-radius:5px;" 
+                    onclick="window.updateMember('${m.key}', '${m.name}', ${m.handicap}, '${m.gender||'남'}')">수정</button>
+                
+                <button class="btn-sm" style="background:var(--warning); color:white; border:none; padding:8px 12px; border-radius:5px;" 
+                    onclick="window.updatePw('${m.key}', '${m.name}', '${m.pw||'1234'}')">비번</button>
+                
+                <button class="btn-sm" style="background:var(--danger); color:white; border:none; padding:8px 12px; border-radius:5px;" 
+                    onclick="window.deleteMember('${m.key}', '${m.name}')">삭제</button>
+            </div>
+        </div>
+    `).join(''); 
+};
+// =========================================================
+// 1. [복구] 정기 모임 저장 함수 (이게 깨져 있었습니다)
+// =========================================================
+window.finalizeToRecords = function() {
+    if(!confirm("오늘의 모든 게임 점수를 개인 장부에 영구 저장하고,\n오늘의 팀 구성(정모 히스토리)도 함께 보관할까요?")) return;
+
+    const now = new Date();
+    const offset = now.getTimezoneOffset() * 60000;
+    const today = new Date(now.getTime() - offset).toISOString().split('T')[0];
+    
+    let updates = {};
+    let saveCount = 0;
+    let memberScores = {};
+
+    // 1. 장부 기록용 데이터 취합
+    for (let g = 1; g <= settings.gameCount; g++) {
+        const teams = gameTeams[g] || [];
+        teams.forEach(t => {
+            t.members.forEach(m => {
+                if (m.name.includes("고스트") || m.isGhost) return;
+                if (!memberScores[m.name]) memberScores[m.name] = [];
+                memberScores[m.name].push(parseInt(m.score) || 0);
+            });
+        });
+    }
+
+    Object.keys(memberScores).forEach(name => {
+        const scs = memberScores[name];
+        if (scs.some(s => s > 0)) {
+            const safeKey = `${today}_${name.replace(/[.#$/[\]]/g, "_")}`;
+            updates[`bowling_v14/records/${safeKey}`] = {
+                date: today, name: name, scs: scs
+            };
+            saveCount++;
+        }
+    });
+
+    if (saveCount === 0) return alert("저장할 점수 데이터가 없습니다.");
+
+    // 2. [추가] 정기모임 스냅샷 저장 (히스토리용)
+    updates[`bowling_v14/regular_history/${today}`] = {
+        date: today,
+        gameTeams: gameTeams,
+        settings: settings
+    };
+
+    db.ref().update(updates).then(() => {
+        alert(`🎉 성공! ${saveCount}명의 기록 저장 및 정모 히스토리 보관이 완료되었습니다.`);
+        location.reload(); 
+    }).catch(err => alert("저장 실패: " + err));
+};
+
+// =========================================================
+// 2. [신규] 번개 히스토리 기능 (저장/감지/불러오기 통합)
+// =========================================================
+
+// =========================================================
+// 🟡 [최종 수정] 번개 히스토리 (기억력 강화 버전)
+// =========================================================
+
+// 전역 변수에 데이터를 담아둡니다 (이게 기억력의 핵심!)
+window.lightningHistoryCache = null;
+
+// =========================================================
+// 🟡 [최종 정밀 수정] 번개 히스토리 기능 (저장 및 실시간 표시)
+// =========================================================
+
+// 1. 데이터를 담아둘 전역 주머니 (파일 최상단이 아니어도 작동하도록 여기에 배치)
+window.lightningHistoryCache = null;
+
+// 2. 번개 기록 저장 함수
+window.saveLightningHistory = function() {
+    const now = new Date();
+    const offset = now.getTimezoneOffset() * 60000;
+    const today = new Date(now.getTime() - offset).toISOString().split('T')[0];
+
+    if(!confirm(`${today} 번개 기록을 히스토리에 보관할까요?\n(개인 에버에는 반영되지 않습니다)`)) return;
+
+    // 현재 화면에 있는 팀/점수 데이터를 그대로 서버에 보냅니다.
+    db.ref('bowling_v14/lightning_history/' + today).set({
+        date: today,
+        gameTeams: gameTeams, // 전역 변수 gameTeams 사용
+        settings: settings || {} 
+    }).then(() => {
+        alert("🎯 번개 히스토리에 안전하게 저장되었습니다!");
+        // 저장이 완료되면 서버 감시자(Listener)가 알아서 버튼을 새로 그립니다.
+    }).catch(err => {
+        alert("❌ 저장 실패: " + err.message);
+    });
+};
+
+// 3. [핵심] 실시간 감시자 (서버에 데이터가 들어오면 즉시 주머니에 넣고 버튼 그리기)
+db.ref('bowling_v14/lightning_history').on('value', sn => {
+    const data = sn.val();
+    window.lightningHistoryCache = data || {}; // 주머니에 저장
+    
+    // 만약 현재 통계 페이지를 보고 있다면 버튼을 즉시 그려줍니다.
+    if(typeof window.renderLightningHistoryButtons === 'function') {
+        window.renderLightningHistoryButtons();
+    }
+});
+
+// 4. 날짜 버튼 목록 그리기 (통계 탭 열 때 호출됨)
+window.renderLightningHistoryButtons = function() {
+    const btnArea = document.getElementById('lightningDateButtons');
+    if(!btnArea) return; // 버튼 넣을 자리가 없으면 중단
+
+    const data = window.lightningHistoryCache;
+    if(!data) {
+        btnArea.innerHTML = '<span style="font-size:0.8rem; color:#ccc; padding:5px;">불러오는 중...</span>';
+        return;
+    }
+
+    const dates = Object.keys(data).sort().reverse().slice(0, 4); // 최신순 4개
+
+    if(dates.length === 0) {
+        btnArea.innerHTML = '<span style="font-size:0.8rem; color:#ccc; padding:5px;">📭 기록 없음</span>';
+        return;
+    }
+
+    btnArea.innerHTML = dates.map(date => {
+        const shortDate = date.split('-').slice(1).join('/');
+        return `
+            <button class="filter-btn" 
+                style="padding:6px 14px; font-size:0.8rem; flex-shrink:0; margin-right:5px; background:#fcc419; color:white; border:none; border-radius:20px; font-weight:bold; cursor:pointer; box-shadow:0 2px 4px rgba(0,0,0,0.1);" 
+                onclick="window.loadLightningHistory('${date}')">
+                📂 ${shortDate}
+            </button>`;
+    }).join('');
+};
+
+// 5. 과거 기록 불러오기 (버튼 클릭 시)
+window.loadLightningHistory = function(date) {
+    const historyData = window.lightningHistoryCache ? window.lightningHistoryCache[date] : null;
+    
+    if(!historyData || !historyData.gameTeams) {
+        return alert("⚠️ 해당 날짜의 데이터를 찾을 수 없습니다.");
+    }
+
+    if(!confirm(`📂 [${date}] 기록을 불러오시겠습니까?\n현재 화면의 점수는 사라지고 과거 기록으로 바뀝니다.`)) return;
+
+    // 데이터 교체
+    gameTeams = historyData.gameTeams;
+    if(historyData.settings) settings = historyData.settings;
+
+    alert(`✅ ${date} 기록 복원 완료!`);
+
+    // 화면 새로고침 (통계 탭 내용 갱신)
+    if(typeof window.renderAllStats === 'function') window.renderAllStats();
+    
+    // 통계 탭으로 강제 이동
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    if(tabBtns[5]) window.showPanel('statsPanel', tabBtns[5]); 
+};
+/* ==========================================================================
+   🚀 [입력 최적화 패치] 점수 입력 시 끊김 및 데이터 증발 방지 시스템
+   ========================================================================== */
+
+// 1. 입력 상태를 관리하는 전역 변수 (방어막)
+window.isScoreEditing = false;
+
+// 2. 기존의 멍청한 감시자를 끄고, 똑똑한 감시자로 교체합니다.
+// (기존 리스너가 중복 실행되지 않도록 먼저 연결을 끊습니다)
+if (db) {
+    db.ref('bowling_v14').off(); 
+
+    db.ref('bowling_v14').on('value', sn => {
+        const val = sn.val() || {};
+
+        // [핵심] 입력 중이 아닐 때만 데이터를 가져옵니다! (점수 사라짐 방지)
+        if (!window.isScoreEditing) {
+            gameTeams = val.gameTeams || {};
+        } else {
+            console.log("🛡️ 입력 중이므로 서버 데이터 덮어쓰기를 방어했습니다.");
+        }
+        
+        // 나머지 데이터는 정상적으로 업데이트
+        members = val.members ? Object.keys(val.members).map(k => ({ ...val.members[k], key: k })) : [];
+        attendees = val.attendees || [];
+        records = val.records ? Object.keys(val.records).map(k => ({ ...val.records[k], key: k })) : [];
+        if(val.settings) settings = val.settings;
+        if(val.managers) managers = val.managers;
+        if(val.laneSettings) laneSettings = val.laneSettings;
+        if(val.selectedBlocks) selectedBlocks = val.selectedBlocks;
+        events = val.events || {};
+
+        if (!window.initialLoadDone) {
+            window.currentTargetGame = 1;
+            window.initialLoadDone = true;
+        }
+
+        // 입력 중이 아닐 때만 화면을 새로 그립니다 (렉 방지)
+        if (typeof window.updateUI === 'function' && !window.isScoreEditing) {
+            window.updateUI();
+        }
+    });
+}
+
+// 3. 입력창 그리기 함수 업그레이드 (포커스 감지 기능 추가)
+window.renderInputs = function() {
+    // 만약 내가 지금 입력 중이라면, 화면을 다시 그리지 않고 가만히 둡니다. (커서 튕김 방지)
+    if (window.isScoreEditing) return;
+
+    const tabs = document.getElementById('inputTabs');
+    let tHtml = ''; 
+    for(let i=1; i<=settings.gameCount; i++) {
+        tHtml += `<div class="rank-tab ${currentInputGame===i?'active':''}" onclick="currentInputGame=${i};window.renderInputs()">${i}G</div>`;
+    }
+    tabs.innerHTML = tHtml;
+    document.getElementById('inputGameTitle').innerText = `${currentInputGame}G`;
+    
+    let gData = gameTeams[currentInputGame] || [];
+    
+    if(currentInputTeam) {
+        gData = gData.filter(t => t.teamNo == currentInputTeam);
+        document.getElementById('filterInfo').style.display = 'block';
+        document.getElementById('filterTeamName').innerText = `Team ${currentInputTeam}`;
+    } else {
+        document.getElementById('filterInfo').style.display = 'none';
+    }
+
+    const area = document.getElementById('inputGridArea');
+    if (!gData || gData.length === 0) {
+        area.innerHTML = '<div style="padding:40px; text-align:center; color:#999; border:2px dashed #ddd; border-radius:10px;">⚠️ 데이터가 없습니다.</div>';
+        return;
+    }
+
+    let h = '';
+    gData.forEach(t => {
+        h += `<div class="input-team-box"><div class="input-team-header">Team ${t.teamNo}</div>`;
+        t.members.forEach(m => {
+            const isG = m.name.includes("고스트") || m.isGhost;
+            const ghostStyle = isG ? 'background:#f1f3f5; color:#777; border:1px solid #ddd;' : '';
+            const readonlyAttr = isG ? 'readonly' : '';
+            const uniqueId = `score_${currentInputGame}_${m.name}`; // 고유 ID 생성
+
+            h += `<div class="score-row">
+                <span class="score-name">${m.name}</span>
+                <input type="number" 
+                       id="${uniqueId}"
+                       inputmode="numeric" 
+                       pattern="[0-9]*" 
+                       class="score-input" 
+                       value="${m.score||0}" 
+                       ${readonlyAttr}
+                       style="${ghostStyle}"
+                       onfocus="window.isScoreEditing=true; this.select();"
+                       onblur="window.isScoreEditing=false; window.saveAllScores();"
+                       oninput="if(this.value.length > 3) this.value = this.value.slice(0, 3); if(this.value > 300) this.value = 300; window.updateScore('${m.name}', this.value)">
+            </div>`;
+        });
+        h += `</div>`;
+    });
+    area.innerHTML = h;
+};
+
+// 4. [보너스] 점수 업데이트 시 불필요한 연산 최소화
+window.updateScore = function(n, v) { 
+    // 로컬 데이터만 빠르게 바꿉니다. (서버 전송 X -> onblur에서 저장)
+    const teams = gameTeams[currentInputGame] || [];
+    for(let t of teams) {
+        for(let m of t.members) {
+            if(m.name === n) {
+                m.score = parseInt(v) || 0;
+                return; // 찾았으면 즉시 종료 (속도 향상)
+            }
+        }
+    }
+};
+window.regularHistoryCache = null;
+
+// 실시간 감시자
+db.ref('bowling_v14/regular_history').on('value', sn => {
+    window.regularHistoryCache = sn.val() || {};
+    if(typeof window.renderRegularHistoryButtons === 'function') window.renderRegularHistoryButtons();
+});
+
+// 정모 히스토리 버튼 그리기
+window.renderRegularHistoryButtons = function() {
+    const btnArea = document.getElementById('regularDateButtons');
+    if(!btnArea || !window.regularHistoryCache) return;
+
+    const dates = Object.keys(window.regularHistoryCache).sort().reverse().slice(0, 4);
+    if(dates.length === 0) {
+        btnArea.innerHTML = '<span style="font-size:0.8rem; color:#ccc;">📭 기록 없음</span>';
+        return;
+    }
+
+    btnArea.innerHTML = dates.map(date => {
+        const shortDate = date.split('-').slice(1).join('/');
+        return `
+            <button class="filter-btn" 
+                style="padding:6px 14px; font-size:0.8rem; flex-shrink:0; background:#fa5252; color:white; border:none; border-radius:20px; font-weight:bold; cursor:pointer;" 
+                onclick="window.loadRegularHistory('${date}')">
+                🏆 ${shortDate}
+            </button>`;
+    }).join('');
+};
+
+// 정모 히스토리 불러오기
+window.loadRegularHistory = function(date) {
+    const historyData = window.regularHistoryCache ? window.regularHistoryCache[date] : null;
+    if(!historyData || !historyData.gameTeams) return alert("⚠️ 데이터를 찾을 수 없습니다.");
+
+    if(!confirm(`🏆 [${date}] 정기모임 기록을 불러오시겠습니까?\n현재 화면의 점수가 과거 기록으로 대체됩니다.`)) return;
+
+    gameTeams = historyData.gameTeams;
+    if(historyData.settings) settings = historyData.settings;
+    alert(`✅ ${date} 정기모임 기록 복원 완료!`);
+    window.renderAllStats();
+};
+/* ===============================================================
+   [누락된 부품 추가] 정기모임 히스토리 저장 및 화면 표시 기능
+   =============================================================== */
+
+// 1. [저장] 정모 점수 저장 시 '히스토리'도 함께 백업하는 최신 버전
+window.finalizeToRecords = function() {
+    if(!confirm("오늘의 모든 게임 점수를 개인 장부에 영구 저장하고,\n오늘의 팀 구성(정모 히스토리)도 함께 보관할까요?")) return;
+
+    const now = new Date();
+    const offset = now.getTimezoneOffset() * 60000;
+    const today = new Date(now.getTime() - offset).toISOString().split('T')[0];
+    
+    let updates = {};
+    let saveCount = 0;
+    let memberScores = {};
+
+    // 1~4G(혹은 6G) 점수 취합
+    for (let g = 1; g <= settings.gameCount; g++) {
+        const teams = gameTeams[g] || [];
+        teams.forEach(t => {
+            t.members.forEach(m => {
+                if (m.name.includes("고스트") || m.isGhost) return;
+                if (!memberScores[m.name]) memberScores[m.name] = [];
+                memberScores[m.name].push(parseInt(m.score) || 0);
+            });
+        });
+    }
+
+    // 장부 기록 생성
+    Object.keys(memberScores).forEach(name => {
+        const scs = memberScores[name];
+        if (scs.some(s => s > 0)) {
+            const safeKey = `${today}_${name.replace(/[.#$/[\]]/g, "_")}`;
+            updates[`bowling_v14/records/${safeKey}`] = {
+                date: today, name: name, scs: scs
+            };
+            saveCount++;
+        }
+    });
+
+    if (saveCount === 0) return alert("저장할 점수 데이터가 없습니다.");
+
+    // 🎯 [핵심] 정기모임 스냅샷 저장 (이 부분이 있어야 과거 기록을 볼 수 있습니다!)
+    updates[`bowling_v14/regular_history/${today}`] = {
+        date: today,
+        gameTeams: gameTeams,
+        settings: settings
+    };
+
+    db.ref().update(updates).then(() => {
+        alert(`🎉 성공! ${saveCount}명의 기록 저장 및 정모 히스토리 보관이 완료되었습니다.`);
+        location.reload(); 
+    }).catch(err => alert("저장 실패: " + err));
+};
+
+// 2. [화면] 통계 페이지에 '정모 기록(빨강)'과 '번개 기록(노랑)' 버튼을 같이 보여주는 최신 버전
+window.renderAllStats = function() {
+    if(typeof window.renderHistoricalStats === 'function') window.renderHistoricalStats();
+    if(typeof window.renderStatsGameTabs === 'function') window.renderStatsGameTabs();
+    if(typeof window.renderCurrentGameStats === 'function') window.renderCurrentGameStats(); 
+
+    const panel = document.getElementById('statsPanel');
+    if(!panel) return;
+
+    // 기존 히스토리 영역 제거 후 새로 생성
+    const oldNav = document.getElementById('historyNavContainer');
+    if(oldNav) oldNav.remove();
+    const oldLight = document.getElementById('lightningHistoryNav'); // 구형 잔재 제거
+    if(oldLight) oldLight.remove();
+
+    const navDiv = document.createElement('div');
+    navDiv.id = 'historyNavContainer';
+    
+    navDiv.style.cssText = "margin-bottom:20px; padding:15px; background:#f8f9fa; border-radius:12px; border:1px solid #eee;";
+    navDiv.innerHTML = `
+        <div style="margin-bottom:12px;">
+            <div style="font-size:0.8rem; color:#e03131; font-weight:bold; margin-bottom:5px;">📅 최근 정기모임 기록</div>
+            <div id="regularDateButtons" style="display:flex; gap:8px; overflow-x:auto; padding-bottom:5px;">
+                 <span style="font-size:0.8rem; color:#ccc;">불러오는 중...</span>
+            </div>
+        </div>
+        <div>
+            <div style="font-size:0.8rem; color:#fab005; font-weight:bold; margin-bottom:5px;">⚡ 최근 번개 기록</div>
+            <div id="lightningDateButtons" style="display:flex; gap:8px; overflow-x:auto; padding-bottom:5px;">
+                 <span style="font-size:0.8rem; color:#ccc;">불러오는 중...</span>
+            </div>
+        </div>
+    `;
+    panel.prepend(navDiv);
+
+    // 버튼 그리기 실행
+    if(typeof window.renderRegularHistoryButtons === 'function') window.renderRegularHistoryButtons();
+    if(typeof window.renderLightningHistoryButtons === 'function') window.renderLightningHistoryButtons();
+
+    // 하단 저장 버튼 구역 (관리자 전용)
+    const totalRankArea = document.getElementById('todayTotalRankTable');
+    if(totalRankArea && isAdmin) {
+        const oldFinalize = document.getElementById('finalizeBtnArea');
+        if(oldFinalize) oldFinalize.remove();
+        const oldLightning = document.getElementById('lightningSaveArea');
+        if(oldLightning) oldLightning.remove();
+
+        const btnDiv = document.createElement('div');
+        btnDiv.style.margin = "30px 0 10px 0";
+        
+        // 현재 모드에 따라 버튼 다르게 표시
+        if (settings.mode === 'regular') {
+            btnDiv.id = 'finalizeBtnArea';
+            btnDiv.innerHTML = `
+                <div style="background:#fff5f5; border:2px solid #ff8787; padding:15px; border-radius:12px; text-align:center;">
+                    <p style="margin:0 0 12px 0; font-weight:bold; color:#e03131;">📅 오늘 정모 성적을 최종 저장할까요?</p>
+                    <button class="universal-btn" style="background:#e03131; margin-bottom:0;" onclick="window.finalizeToRecords()">📥 정모 최종 저장 (에버 반영 + 히스토리 보관)</button>
+                </div>`;
+        } else {
+            btnDiv.id = 'lightningSaveArea';
+            btnDiv.innerHTML = `
+                <div style="background:#fff9db; border:2px solid #fab005; padding:15px; border-radius:12px; text-align:center;">
+                    <p style="margin:0 0 12px 0; font-weight:bold; color:#856404;">⚡ 오늘 번개 기록을 히스토리에 보관할까요?</p>
+                    <button class="universal-btn" style="background:#fab005; color:#000; margin-bottom:0;" onclick="window.saveLightningHistory()">📥 번개 기록 보관 (에버 미반영)</button>
+                </div>`;
+        }
+        totalRankArea.parentNode.insertBefore(btnDiv, totalRankArea);
+    }
+};
+</script>
+</body>
+</html>
