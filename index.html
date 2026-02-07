@@ -2367,8 +2367,6 @@ if (db) {
 
 // 3. 입력창 그리기 함수 업그레이드 (포커스 감지 기능 추가)
 window.renderInputs = function() {
-    // [핵심] 입력 중(커서가 깜빡일 때)에는 화면을 다시 그리지 않음
-    // 이 코드가 있어야 화면이 위아래로 출렁이지 않습니다.
     if (window.isScoreEditing) return; 
 
     const tabs = document.getElementById('inputTabs');
@@ -2401,7 +2399,6 @@ window.renderInputs = function() {
             const isG = m.name.includes("고스트") || m.isGhost;
             h += `<div class="score-row">
                 <span class="score-name">${m.name}</span>
-                /* 화면 흔들림의 주범인 this.select()를 완전히 제거한 버전입니다 */
                 <input type="number" 
                        inputmode="numeric" 
                        pattern="[0-9]*" 
