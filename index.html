@@ -20,32 +20,39 @@
     <style>
         /* 기본 설정 */
         :root { --primary: #2c3e50; --accent: #3498db; --danger: #e74c3c; --warning: #f39c12; --bg: #f8f9fa; --green: #27ae60; --dark: #34495e; --purple: #8e44ad; }
-        html { height: 100%; } 
-        body { 
-        font-family: 'Pretendard', sans-serif; 
-        background: var(--bg); 
-        margin: 0; 
-        padding: 0; 
-        font-size: 14px; 
-        color: #333; 
-        height: 100%;         /* vh 대신 % 사용 */
-        overflow-x: hidden;   /* 가로 떨림 방지 */
-        position: relative;   /* 요소 배치 안정화 */
-        padding-bottom: 80px; 
-        -webkit-tap-highlight-color: transparent; 
-    }
+        /* 1. 겉틀 고정 (키보드가 올라와도 전체 화면이 밀리지 않음) */
+html, body {
+    height: 100%;             /* vh 대신 % 사용 (필수) */
+    margin: 0;
+    padding: 0;
+    overflow: hidden;         /* 전체 화면 스크롤 막기 */
+    position: fixed;          /* 화면 위치 딱 고정 */
+    width: 100%;
+}
         
         input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
         input[type="number"] { -moz-appearance: textfield; }
 
-        .container { max-width: 800px; margin: 0 auto; background: white; min-height: 100vh; display: flex; flex-direction: column; }
+        /* 2. 속알맹이 스크롤 (점수판만 부드럽게 오르내림) */
+.container {
+    height: 100%;             /* 전체 높이 사용 */
+    overflow-y: auto;         /* 내용이 많으면 이 안에서만 스크롤 */
+    -webkit-overflow-scrolling: touch; /* 아이폰에서 부드럽게 */
+    display: flex;
+    flex-direction: column;
+}
         .header { padding: 15px; background: #fff; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 2000; }
         
         .tab-menu { display: flex; gap: 5px; padding: 10px; background: #fff; border-bottom: 1px solid #ddd; position: sticky; top: 53px; z-index: 1900; overflow-x: auto; white-space: nowrap; }
         .tab-btn { flex: 1; padding: 12px 0; border: 1px solid #eee; background: #f8f9fa; border-radius: 8px; font-weight: bold; cursor: pointer; min-width: 60px; text-align: center; color: #555; }
         .tab-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
         
-        .content-area { padding: 15px; flex: 1; margin-top: 5px; }
+        /* 3. 입력창이 가려지지 않게 하단 여백 확보 */
+.content-area {
+    flex: 1;
+    overflow-y: auto;
+    padding-bottom: 300px;    /* 키보드 올라올 공간 미리 확보 */
+}
         .panel { display: none; } .panel.active { display: block; }
         .input-box { background: white; padding: 15px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #eee; box-shadow: 0 2px 5px rgba(0,0,0,0.03); }
         .universal-btn { width: 100%; padding: 15px; font-weight: bold; border-radius: 8px; border: none; cursor: pointer; color: white; font-size: 1rem; margin-bottom: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
@@ -925,64 +932,7 @@ window.setTargetGame = function(gameNo) {
     console.log(`${gameNo}G 조편성 모드로 전환!`);
 };
 
-    // ========================================================
-// 🏆 [ACE Golden Logic] 통합 배정 엔진 (AI & 랜덤 전용)
-// ========================================================
-// 1. 배정 로직 (황금 로직 적용 버전)
-window.runAssignment = function() {
-    if(selectedBlocks.length === 0 || attendees.length === 0) return alert("구역과 참석자를 확인하세요.");
-
-    const teamCount = selectedBlocks.length * 2;
-    const totalPeople = attendees.length;
-    const baseSize = Math.floor(totalPeople / teamCount);
-    const remainder = totalPeople % teamCount;
-
-    let women = [], men = [];
-    attendees.forEach(n => {
-        const s = window.getWeightedStats(n);
-        const m = members.find(x => x.name === n) || {gender:'남', handicap:0};
-        const p = { name: n, avg: s.weightedAvg, gender: m.gender, isGhost: false, handicap: m.handicap || 0, score: 0 };
-        if(p.gender === '여') women.push(p); else men.push(p);
-    });
-
-    let finalTeams = [];
-    for(let i=0; i<teamCount; i++) {
-        let cap = baseSize + (i < remainder ? 1 : 0);
-        finalTeams.push({ teamNo: i + 1, humanCap: cap, capacity: 5, members: [], totalAvg: 0 });
-    }
-
-    // 여성 균등 배치 후 남성 실력순 배치
-    women.sort((a,b)=>b.avg-a.avg).forEach((p, i) => { finalTeams[i % teamCount].members.push(p); finalTeams[i % teamCount].totalAvg += p.avg; });
-    men.sort((a,b)=>b.avg-a.avg).forEach(p => {
-        let targets = finalTeams.filter(t => t.members.length < t.humanCap);
-        targets.sort((a,b) => a.totalAvg - b.totalAvg);
-        if(targets.length > 0) { targets[0].members.push(p); targets[0].totalAvg += p.avg; }
-    });
-
-    // 부족한 인원 고스트 투입
-    finalTeams.forEach(t => {
-        while(t.members.length < t.capacity) t.members.push({ name: "👻고스트", avg: 0, gender: "남", isGhost: true, handicap: 0, score: 0 });
-    });
-
-    // 레인 좌3:우2 배치 및 매치핸디 계산
-    let lanePairs = [];
-    selectedBlocks.sort((a,b)=>a-b).forEach(z => { lanePairs.push([(z-1)*4+3, (z-1)*4+4], [(z-1)*4+5, (z-1)*4+6]); });
-    const maxAvg = Math.max(...finalTeams.map(t => t.totalAvg));
-
-    finalTeams.sort((a,b) => a.teamNo - b.teamNo).forEach((t, i) => {
-        const pair = lanePairs[i] || [0,0];
-        t.members.sort((a,b) => b.avg - a.avg);
-        t.members.forEach((m, idx) => { m.lane = (idx < 3) ? pair[0] : pair[1]; });
-        t.matchHandy = Math.max(0, Math.round(maxAvg - t.totalAvg));
-    });
-
-    gameTeams[currentTargetGame] = finalTeams;
-    db.ref('bowling_v14/gameTeams').set(gameTeams).then(() => {
-        alert(`✅ ${currentTargetGame}G 배정 완료!`);
-        currentRankView = currentTargetGame;
-        window.showPanel('progressPanel', document.querySelectorAll('.tab-btn')[3]); // 🚀 즉시 이동
-    });
-};
+    
 
 // 2. 버튼 클릭 시 실제 실행되는 함수 (여기서 runAssignment를 부릅니다)
 window.runGeneralAssignment = function() {
@@ -1417,10 +1367,14 @@ window.getWeightedStats = function(name) {
 // 2. [배정 엔진] 5인조 고정, 지그재그 레인, 자동 페이지 이동
 window.runAssignment = function() {
     if(selectedBlocks.length === 0 || attendees.length === 0) return alert("구역과 참석자를 확인하세요.");
+
     const teamCount = selectedBlocks.length * 2;
     const totalPeople = attendees.length;
+    
+    // 팀별 기본 배정 인원 계산 (예: 16명/4팀 = 4명)
     const baseSize = Math.floor(totalPeople / teamCount);
     const remainder = totalPeople % teamCount;
+
     let women = [], men = [];
     attendees.forEach(n => {
         const s = window.getWeightedStats(n);
@@ -1428,32 +1382,58 @@ window.runAssignment = function() {
         const p = { name: n, avg: s.weightedAvg, gender: m.gender, isGhost: false, handicap: m.handicap || 0, score: 0 };
         if(p.gender === '여') women.push(p); else men.push(p);
     });
+
     let finalTeams = [];
     for(let i=0; i<teamCount; i++) {
+        // 실제 사람이 들어갈 자리 수 (remainder가 있으면 일부 팀은 +1명)
         let cap = baseSize + (i < remainder ? 1 : 0);
         finalTeams.push({ teamNo: i + 1, humanCap: cap, capacity: 5, members: [], totalAvg: 0 });
     }
-    women.sort((a,b)=>b.avg-a.avg).forEach((p, i) => { finalTeams[i % teamCount].members.push(p); finalTeams[i % teamCount].totalAvg += p.avg; });
+
+    // 1. 여성 실력순 균등 분배
+    women.sort((a,b)=>b.avg-a.avg).forEach((p, i) => { 
+        finalTeams[i % teamCount].members.push(p); 
+        finalTeams[i % teamCount].totalAvg += p.avg; 
+    });
+    
+    // 2. 남성 실력순 밸런스 분배
     men.sort((a,b)=>b.avg-a.avg).forEach(p => {
         let targets = finalTeams.filter(t => t.members.length < t.humanCap);
         targets.sort((a,b) => a.totalAvg - b.totalAvg);
-        if(targets.length > 0) { targets[0].members.push(p); targets[0].totalAvg += p.avg; }
+        if(targets.length > 0) { 
+            targets[0].members.push(p); 
+            targets[0].totalAvg += p.avg; 
+        }
     });
-    finalTeams.forEach(t => { while(t.members.length < 5) t.members.push({ name: "👻고스트", avg: 0, gender: "남", isGhost: true, handicap: 0, score: 0 }); });
+
+    // 3. [핵심 수정] 인원이 부족할 때만 고스트 투입 (기존 capacity 대신 humanCap 기준)
+    finalTeams.forEach(t => { 
+        // humanCap까지는 이미 사람이 찼으므로, 이 루프는 인원이 딱 맞으면 실행되지 않습니다.
+        while(t.members.length < t.humanCap) {
+            t.members.push({ name: "👻고스트", avg: 0, gender: "남", isGhost: true, handicap: 0, score: 0 });
+        }
+    });
+
+    // 4. 레인 배치 및 매치핸디 계산
     let lanePairs = [];
     selectedBlocks.sort((a,b)=>a-b).forEach(z => { lanePairs.push([(z-1)*4+3, (z-1)*4+4], [(z-1)*4+5, (z-1)*4+6]); });
     const maxAvg = Math.max(...finalTeams.map(t => t.totalAvg));
+
     finalTeams.sort((a,b) => a.teamNo - b.teamNo).forEach((t, i) => {
         const pair = lanePairs[i] || [0,0];
         t.members.sort((a,b) => b.avg - a.avg);
-        t.members.forEach((m, idx) => { m.lane = (idx % 2 === 0) ? pair[0] : pair[1]; }); // 지그재그 배치
+        // 지그재그 배치 (1,3,5위 좌측 / 2,4위 우측)
+        t.members.forEach((m, idx) => { m.lane = (idx % 2 === 0) ? pair[0] : pair[1]; });
         t.matchHandy = Math.max(0, Math.round(maxAvg - t.totalAvg));
     });
+
+    // 5. 저장 및 화면 전환
     gameTeams[currentTargetGame] = finalTeams;
     db.ref('bowling_v14/gameTeams').set(gameTeams).then(() => {
         alert(`✅ ${currentTargetGame}G 배정 완료!`);
         currentRankView = currentTargetGame;
-        window.showPanel('progressPanel', document.querySelectorAll('.tab-btn')[3]); // 즉시 이동
+        // 배정 즉시 [진행] 탭으로 이동
+        window.showPanel('progressPanel', document.querySelectorAll('.tab-btn')[3]); 
     });
 };
 
