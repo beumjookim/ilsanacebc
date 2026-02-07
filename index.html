@@ -1635,17 +1635,30 @@ window.toggleEventJoin = function(id, userName) {
     }
 
     const gIdx = currentTargetGame; 
-    if (confirm(`⚠️ [정밀 초기화] 현재 진행 중인 [${gIdx}G] 데이터와 번개장 설정을 초기화할까요?`)) {
+    if (confirm(`⚠️ [완전 초기화] 현재 [${gIdx}G]의 팀 배정 결과와\n입력된 '레인/팀 설정'을 모두 삭제하시겠습니까?`)) {
         
         let updates = {};
+        // 1. 결과 삭제
         updates[`bowling_v14/gameTeams/${gIdx}`] = null;
         updates['bowling_v14/casino'] = null;
-        updates['bowling_v14/managers/lightning'] = ''; 
+        updates['bowling_v14/managers/lightning'] = null;
+
+        // 2. [핵심 수정] 레인 설정과 구역 선택도 삭제
+        updates['bowling_v14/laneSettings'] = null; 
+        updates['bowling_v14/selectedBlocks'] = null; 
 
         db.ref().update(updates).then(() => {
+            // 로컬 변수도 즉시 비움 (화면 갱신용)
             if(gameTeams[gIdx]) delete gameTeams[gIdx];
-            alert(`✅ ${gIdx}G 데이터 및 번개장 설정이 초기화되었습니다.`);
+            laneSettings = {};
+            selectedBlocks = [];
+
+            // 구역 버튼 색깔 빼기
+            document.querySelectorAll('.zone-btn').forEach(b => b.classList.remove('selected'));
+
+            alert(`✅ ${gIdx}G 배정 결과와 설정이 깨끗하게 초기화되었습니다.`);
             
+            // 화면 즉시 갱신
             if(window.renderCustomLaneConfig) window.renderCustomLaneConfig();
             if(window.renderAssignGameTabs) window.renderAssignGameTabs();
             if(window.updateUI) window.updateUI(); 
