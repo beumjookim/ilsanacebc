@@ -6,8 +6,8 @@
     <title>Ace Bowling V18.0 (Final)</title>
     <link rel="manifest" href="./manifest.json">
     <meta name="theme-color" content="#3498db">
-    
-    <link rel="shortcut icon" href="./icon-192x192.png">
+
+<link rel="shortcut icon" href="./icon-192x192.png">
     
     <link rel="apple-touch-icon" href="./icon-192x192.png">
     <link rel="icon" sizes="512x512" href="./icon-512x512.png">
@@ -785,69 +785,7 @@ window.renderBungaeJangSelect = function() {
     area.innerHTML = html || '<div style="text-align:center; padding:50px; color:#adb5bd;">모임 일정이 없습니다.</div>';
 };
 
-window.renderAllStats = function() {
-    if(typeof window.renderHistoricalStats === 'function') window.renderHistoricalStats();
-    if(typeof window.renderStatsGameTabs === 'function') window.renderStatsGameTabs();
-    if(typeof window.renderCurrentGameStats === 'function') window.renderCurrentGameStats(); 
 
-    const panel = document.getElementById('statsPanel');
-    if(!panel) return;
-
-    // 기존 히스토리 영역 제거 후 새로 생성
-    const oldNav = document.getElementById('historyNavContainer');
-    if(oldNav) oldNav.remove();
-
-    const navDiv = document.createElement('div');
-    navDiv.id = 'historyNavContainer';
-    navDiv.style.cssText = "margin-bottom:20px; padding:15px; background:#f8f9fa; border-radius:12px; border:1px solid #eee;";
-    navDiv.innerHTML = `
-        <div style="margin-bottom:12px;">
-            <div style="font-size:0.8rem; color:#e03131; font-weight:bold; margin-bottom:5px;">📅 최근 정기모임 기록</div>
-            <div id="regularDateButtons" style="display:flex; gap:8px; overflow-x:auto; padding-bottom:5px;">
-                 <span style="font-size:0.8rem; color:#ccc;">불러오는 중...</span>
-            </div>
-        </div>
-        <div>
-            <div style="font-size:0.8rem; color:#fab005; font-weight:bold; margin-bottom:5px;">⚡ 최근 번개 기록</div>
-            <div id="lightningDateButtons" style="display:flex; gap:8px; overflow-x:auto; padding-bottom:5px;">
-                 <span style="font-size:0.8rem; color:#ccc;">불러오는 중...</span>
-            </div>
-        </div>
-    `;
-    panel.prepend(navDiv);
-
-    // 버튼 그리기 실행
-    if(typeof window.renderRegularHistoryButtons === 'function') window.renderRegularHistoryButtons();
-    if(typeof window.renderLightningHistoryButtons === 'function') window.renderLightningHistoryButtons();
-
-    // 하단 저장 버튼 구역 (관리자 전용)
-    const totalRankArea = document.getElementById('todayTotalRankTable');
-    if(totalRankArea && isAdmin) {
-        const oldFinalize = document.getElementById('finalizeBtnArea');
-        if(oldFinalize) oldFinalize.remove();
-        const oldLightning = document.getElementById('lightningSaveArea');
-        if(oldLightning) oldLightning.remove();
-
-        const btnDiv = document.createElement('div');
-        btnDiv.style.margin = "30px 0 10px 0";
-        if (settings.mode === 'regular') {
-            btnDiv.id = 'finalizeBtnArea';
-            btnDiv.innerHTML = `
-                <div style="background:#fff5f5; border:2px solid #ff8787; padding:15px; border-radius:12px; text-align:center;">
-                    <p style="margin:0 0 12px 0; font-weight:bold; color:#e03131;">📅 오늘 정모 성적을 최종 저장할까요?</p>
-                    <button class="universal-btn" style="background:#e03131; margin-bottom:0;" onclick="window.finalizeToRecords()">📥 정모 최종 저장 (에버 반영 + 히스토리 보관)</button>
-                </div>`;
-        } else {
-            btnDiv.id = 'lightningSaveArea';
-            btnDiv.innerHTML = `
-                <div style="background:#fff9db; border:2px solid #fab005; padding:15px; border-radius:12px; text-align:center;">
-                    <p style="margin:0 0 12px 0; font-weight:bold; color:#856404;">⚡ 오늘 번개 기록을 히스토리에 보관할까요?</p>
-                    <button class="universal-btn" style="background:#fab005; color:#000; margin-bottom:0;" onclick="window.saveLightningHistory()">📥 번개 기록 보관 (에버 미반영)</button>
-                </div>`;
-        }
-        totalRankArea.parentNode.insertBefore(btnDiv, totalRankArea);
-    }
-};
 
 window.activateSelectedEventDirect = function(id) {
     const ev = events[id];
@@ -941,57 +879,7 @@ window.activateSelectedEvent = function() {
         window.renderInputs();
     };
 
-    window.renderInputs = function() {
-        const tabs = document.getElementById('inputTabs');
-        let tHtml = ''; 
-        for(let i=1; i<=settings.gameCount; i++) {
-            tHtml += `<div class="rank-tab ${currentInputGame===i?'active':''}" onclick="currentInputGame=${i};window.renderInputs()">${i}G</div>`;
-        }
-        tabs.innerHTML = tHtml;
-        document.getElementById('inputGameTitle').innerText = `${currentInputGame}G`;
-        
-        let gData = gameTeams[currentInputGame] || [];
-        
-        if(currentInputTeam) {
-            gData = gData.filter(t => t.teamNo == currentInputTeam);
-            document.getElementById('filterInfo').style.display = 'block';
-            document.getElementById('filterTeamName').innerText = `Team ${currentInputTeam}`;
-        } else {
-            document.getElementById('filterInfo').style.display = 'none';
-        }
-
-        const area = document.getElementById('inputGridArea');
-        if (!gData || gData.length === 0) {
-            area.innerHTML = '<div style="padding:40px; text-align:center; color:#999; border:2px dashed #ddd; border-radius:10px;">⚠️ 데이터가 없습니다.</div>';
-            return;
-        }
-
-        let h = '';
-        gData.forEach(t => {
-            h += `<div class="input-team-box"><div class="input-team-header">Team ${t.teamNo}</div>`;
-            t.members.forEach(m => {
-                const isG = m.name.includes("고스트") || m.isGhost;
-                const ghostStyle = isG ? 'background:#f1f3f5; color:#777; border:1px solid #ddd;' : '';
-                const readonlyAttr = isG ? 'readonly' : '';
-
-                h += `<div class="score-row">
-                    <span class="score-name">${m.name}</span>
-                    <input type="number" 
-                           inputmode="numeric" 
-                           pattern="[0-9]*" 
-                           class="score-input" 
-                           value="${m.score||0}" 
-                           ${readonlyAttr}
-                           style="${ghostStyle}"
-                           onfocus="this.select()"
-                           oninput="if(this.value.length > 3) this.value = this.value.slice(0, 3); if(this.value > 300) this.value = 300;"
-                           onchange="window.updateScore('${m.name}', this.value)">
-                </div>`;
-            });
-            h += `</div>`;
-        });
-        area.innerHTML = h;
-    };
+    
 
     window.setJungmoManager = function() {
         const name = document.getElementById('jungmoJangInput').value.trim();
@@ -2323,54 +2211,7 @@ window.renderMembers = function() {
 // =========================================================
 // 1. [복구] 정기 모임 저장 함수 (이게 깨져 있었습니다)
 // =========================================================
-window.finalizeToRecords = function() {
-    if(!confirm("오늘의 모든 게임 점수를 개인 장부에 영구 저장하고,\n오늘의 팀 구성(정모 히스토리)도 함께 보관할까요?")) return;
 
-    const now = new Date();
-    const offset = now.getTimezoneOffset() * 60000;
-    const today = new Date(now.getTime() - offset).toISOString().split('T')[0];
-    
-    let updates = {};
-    let saveCount = 0;
-    let memberScores = {};
-
-    // 1. 장부 기록용 데이터 취합
-    for (let g = 1; g <= settings.gameCount; g++) {
-        const teams = gameTeams[g] || [];
-        teams.forEach(t => {
-            t.members.forEach(m => {
-                if (m.name.includes("고스트") || m.isGhost) return;
-                if (!memberScores[m.name]) memberScores[m.name] = [];
-                memberScores[m.name].push(parseInt(m.score) || 0);
-            });
-        });
-    }
-
-    Object.keys(memberScores).forEach(name => {
-        const scs = memberScores[name];
-        if (scs.some(s => s > 0)) {
-            const safeKey = `${today}_${name.replace(/[.#$/[\]]/g, "_")}`;
-            updates[`bowling_v14/records/${safeKey}`] = {
-                date: today, name: name, scs: scs
-            };
-            saveCount++;
-        }
-    });
-
-    if (saveCount === 0) return alert("저장할 점수 데이터가 없습니다.");
-
-    // 2. [추가] 정기모임 스냅샷 저장 (히스토리용)
-    updates[`bowling_v14/regular_history/${today}`] = {
-        date: today,
-        gameTeams: gameTeams,
-        settings: settings
-    };
-
-    db.ref().update(updates).then(() => {
-        alert(`🎉 성공! ${saveCount}명의 기록 저장 및 정모 히스토리 보관이 완료되었습니다.`);
-        location.reload(); 
-    }).catch(err => alert("저장 실패: " + err));
-};
 
 // =========================================================
 // 2. [신규] 번개 히스토리 기능 (저장/감지/불러오기 통합)
@@ -2755,7 +2596,60 @@ window.renderAllStats = function() {
         totalRankArea.parentNode.insertBefore(btnDiv, totalRankArea);
     }
 };
+// 1. [신규] 조용히 저장하는 함수 (입력창 이동할 때 씀)
+window.silentSave = function() {
+    // 알림창(Alert) 없이 데이터만 조용히 서버에 보냅니다.
+    db.ref('bowling_v14/gameTeams').set(gameTeams).then(() => {
+        console.log("자동 저장 완료 (조용함)");
+    });
+};
+
+// 2. [수정] 입력창 그리기 함수 (조용한 저장 기능 적용)
+window.renderInputs = function() {
+    if (window.isScoreEditing) return; // 입력 중이면 화면 다시 그리지 않음
+
+    const tabs = document.getElementById('inputTabs');
+    let tHtml = ''; 
+    for(let i=1; i<=settings.gameCount; i++) {
+        tHtml += `<div class="rank-tab ${currentInputGame===i?'active':''}" onclick="currentInputGame=${i};window.renderInputs()">${i}G</div>`;
+    }
+    tabs.innerHTML = tHtml;
+    document.getElementById('inputGameTitle').innerText = `${currentInputGame}G`;
+    
+    let gData = gameTeams[currentInputGame] || [];
+    if(currentInputTeam) {
+        gData = gData.filter(t => t.teamNo == currentInputTeam);
+        document.getElementById('filterInfo').style.display = 'block';
+        document.getElementById('filterTeamName').innerText = `Team ${currentInputTeam}`;
+    } else {
+        document.getElementById('filterInfo').style.display = 'none';
+    }
+
+    const area = document.getElementById('inputGridArea');
+    if (!gData || gData.length === 0) {
+        area.innerHTML = '<div style="padding:40px; text-align:center; color:#999; border:2px dashed #ddd; border-radius:10px;">⚠️ 데이터가 없습니다.</div>';
+        return;
+    }
+
+    let h = '';
+    gData.forEach(t => {
+        h += `<div class="input-team-box"><div class="input-team-header">Team ${t.teamNo}</div>`;
+        t.members.forEach(m => {
+            const isG = m.name.includes("고스트") || m.isGhost;
+            // ★ 핵심 수정: onblur에서 saveAllScores() 대신 silentSave()를 호출합니다.
+            h += `<div class="score-row">
+                <span class="score-name">${m.name}</span>
+                <input type="number" inputmode="numeric" pattern="[0-9]*" class="score-input" value="${m.score||0}" 
+                       ${isG ? 'readonly style="background:#f1f3f5; color:#777;"' : ''}
+                       onfocus="window.isScoreEditing=true; this.select();"
+                       onblur="window.isScoreEditing=false; window.silentSave();" 
+                       oninput="if(this.value.length > 3) this.value = this.value.slice(0, 3); if(this.value > 300) this.value = 300; window.updateScore('${m.name}', this.value)">
+            </div>`;
+        });
+        h += `</div>`;
+    });
+    area.innerHTML = h;
+};
 </script>
 </body>
-
 </html>
