@@ -20,7 +20,20 @@
     <style>
         /* 기본 설정 */
         :root { --primary: #2c3e50; --accent: #3498db; --danger: #e74c3c; --warning: #f39c12; --bg: #f8f9fa; --green: #27ae60; --dark: #34495e; --purple: #8e44ad; }
-        body { font-family: 'Pretendard', sans-serif; background: var(--bg); margin: 0; padding: 0; font-size: 14px; color: #333; min-height: 100vh; padding-bottom: 80px; -webkit-tap-highlight-color: transparent; }
+        html { height: 100%; } 
+        body { 
+        font-family: 'Pretendard', sans-serif; 
+        background: var(--bg); 
+        margin: 0; 
+        padding: 0; 
+        font-size: 14px; 
+        color: #333; 
+        height: 100%;         /* vh 대신 % 사용 */
+        overflow-x: hidden;   /* 가로 떨림 방지 */
+        position: relative;   /* 요소 배치 안정화 */
+        padding-bottom: 80px; 
+        -webkit-tap-highlight-color: transparent; 
+    }
         
         input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
         input[type="number"] { -moz-appearance: textfield; }
@@ -2361,8 +2374,9 @@ if (db) {
 
 // 3. 입력창 그리기 함수 업그레이드 (포커스 감지 기능 추가)
 window.renderInputs = function() {
-    // 만약 내가 지금 입력 중이라면, 화면을 다시 그리지 않고 가만히 둡니다. (커서 튕김 방지)
-    if (window.isScoreEditing) return;
+    // [핵심] 입력 중(커서가 깜빡일 때)에는 화면을 다시 그리지 않음
+    // 이 코드가 있어야 화면이 위아래로 출렁이지 않습니다.
+    if (window.isScoreEditing) return; 
 
     const tabs = document.getElementById('inputTabs');
     let tHtml = ''; 
@@ -2373,7 +2387,6 @@ window.renderInputs = function() {
     document.getElementById('inputGameTitle').innerText = `${currentInputGame}G`;
     
     let gData = gameTeams[currentInputGame] || [];
-    
     if(currentInputTeam) {
         gData = gData.filter(t => t.teamNo == currentInputTeam);
         document.getElementById('filterInfo').style.display = 'block';
@@ -2393,22 +2406,16 @@ window.renderInputs = function() {
         h += `<div class="input-team-box"><div class="input-team-header">Team ${t.teamNo}</div>`;
         t.members.forEach(m => {
             const isG = m.name.includes("고스트") || m.isGhost;
-            const ghostStyle = isG ? 'background:#f1f3f5; color:#777; border:1px solid #ddd;' : '';
-            const readonlyAttr = isG ? 'readonly' : '';
-            const uniqueId = `score_${currentInputGame}_${m.name}`; // 고유 ID 생성
-
             h += `<div class="score-row">
                 <span class="score-name">${m.name}</span>
                 <input type="number" 
-                       id="${uniqueId}"
                        inputmode="numeric" 
                        pattern="[0-9]*" 
                        class="score-input" 
                        value="${m.score||0}" 
-                       ${readonlyAttr}
-                       style="${ghostStyle}"
+                       ${isG ? 'readonly style="background:#f1f3f5; color:#777;"' : ''}
                        onfocus="window.isScoreEditing=true; this.select();"
-                       onblur="window.isScoreEditing=false; window.saveAllScores();"
+                       onblur="window.isScoreEditing=false; window.silentSave();" 
                        oninput="if(this.value.length > 3) this.value = this.value.slice(0, 3); if(this.value > 300) this.value = 300; window.updateScore('${m.name}', this.value)">
             </div>`;
         });
@@ -2604,52 +2611,7 @@ window.silentSave = function() {
     });
 };
 
-// 2. [수정] 입력창 그리기 함수 (조용한 저장 기능 적용)
-window.renderInputs = function() {
-    if (window.isScoreEditing) return; // 입력 중이면 화면 다시 그리지 않음
 
-    const tabs = document.getElementById('inputTabs');
-    let tHtml = ''; 
-    for(let i=1; i<=settings.gameCount; i++) {
-        tHtml += `<div class="rank-tab ${currentInputGame===i?'active':''}" onclick="currentInputGame=${i};window.renderInputs()">${i}G</div>`;
-    }
-    tabs.innerHTML = tHtml;
-    document.getElementById('inputGameTitle').innerText = `${currentInputGame}G`;
-    
-    let gData = gameTeams[currentInputGame] || [];
-    if(currentInputTeam) {
-        gData = gData.filter(t => t.teamNo == currentInputTeam);
-        document.getElementById('filterInfo').style.display = 'block';
-        document.getElementById('filterTeamName').innerText = `Team ${currentInputTeam}`;
-    } else {
-        document.getElementById('filterInfo').style.display = 'none';
-    }
-
-    const area = document.getElementById('inputGridArea');
-    if (!gData || gData.length === 0) {
-        area.innerHTML = '<div style="padding:40px; text-align:center; color:#999; border:2px dashed #ddd; border-radius:10px;">⚠️ 데이터가 없습니다.</div>';
-        return;
-    }
-
-    let h = '';
-    gData.forEach(t => {
-        h += `<div class="input-team-box"><div class="input-team-header">Team ${t.teamNo}</div>`;
-        t.members.forEach(m => {
-            const isG = m.name.includes("고스트") || m.isGhost;
-            // ★ 핵심 수정: onblur에서 saveAllScores() 대신 silentSave()를 호출합니다.
-            h += `<div class="score-row">
-                <span class="score-name">${m.name}</span>
-                <input type="number" inputmode="numeric" pattern="[0-9]*" class="score-input" value="${m.score||0}" 
-                       ${isG ? 'readonly style="background:#f1f3f5; color:#777;"' : ''}
-                       onfocus="window.isScoreEditing=true; this.select();"
-                       onblur="window.isScoreEditing=false; window.silentSave();" 
-                       oninput="if(this.value.length > 3) this.value = this.value.slice(0, 3); if(this.value > 300) this.value = 300; window.updateScore('${m.name}', this.value)">
-            </div>`;
-        });
-        h += `</div>`;
-    });
-    area.innerHTML = h;
-};
 </script>
 </body>
 </html>
