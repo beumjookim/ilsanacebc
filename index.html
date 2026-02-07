@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
     <title>Ace Bowling V18.0 (Final)</title>
     <link rel="manifest" href="./manifest.json">
     <meta name="theme-color" content="#3498db">
@@ -22,12 +22,18 @@
         :root { --primary: #2c3e50; --accent: #3498db; --danger: #e74c3c; --warning: #f39c12; --bg: #f8f9fa; --green: #27ae60; --dark: #34495e; --purple: #8e44ad; }
         /* 1. 겉틀 고정 (키보드가 올라와도 전체 화면이 밀리지 않음) */
 html, body {
-    height: 100%;             /* vh 대신 % 사용 (필수) */
+    height: 100%;
     margin: 0;
     padding: 0;
-    overflow: hidden;         /* 전체 화면 스크롤 막기 */
-    position: fixed;          /* 화면 위치 딱 고정 */
+    overflow: hidden;
+    position: fixed;
     width: 100%;
+    
+    /* ★ 여기부터 추가된 코드입니다 ★ */
+    -webkit-text-size-adjust: 100%; /* 아이폰 글자 뻥튀기 금지 */
+    -moz-text-size-adjust: 100%;    /* 파이어폭스 금지 */
+    text-size-adjust: 100%;         /* 표준 금지 */
+    font-size: 14px;                /* 기본 글자 크기 고정 */
 }
         
         input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
@@ -156,7 +162,19 @@ html, body {
         .admin-btn, #settings button { width: 280px !important; height: 45px !important; line-height: 45px !important; padding: 0 !important; margin: 10px auto !important; display: block !important; font-size: 16px !important; font-weight: bold !important; border-radius: 8px !important; text-align: center !important; border: none !important; cursor: pointer !important; }
         .excel-green { background-color: #28a745 !important; color: white !important; }
         .over-200 { color: #ff0000 !important; font-weight: bold !important; }
-    </style>
+   /* 모바일에서 입력창 글씨가 너무 커지지 않게 조절 */
+    input, select, button {
+        font-size: 14px !important; /* 강제로 14px로 고정 */
+        max-height: 40px;           /* 높이도 너무 커지지 않게 */
+    }
+
+    /* 점수 입력칸은 조금 커도 되지만 너무 크지 않게 */
+    .score-input {
+        font-size: 1.2rem !important; /* 1.4rem에서 약간 줄임 */
+        padding: 8px !important;      /* 여백도 줄임 */
+        height: 40px !important;
+    }
+   </style>
 </head>
 <body>
 
