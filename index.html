@@ -542,6 +542,10 @@ html, body {
     let managers = { jungmo: '', lightning: '' }; 
     let selectedBlocks = [], laneSettings = {};   
     let db = null;
+    // [추가] 주소창에서 특정 이벤트 ID가 있는지 확인하고 기억함
+const urlParams = new URLSearchParams(window.location.search);
+const jumpTarget = urlParams.get('eventId');
+if (jumpTarget) sessionStorage.setItem('jumpToEvent', jumpTarget);
     let loggedInUser = localStorage.getItem('loggedInUser');
     let isAdmin = localStorage.getItem('ace_admin') === 'true';
     
@@ -749,6 +753,7 @@ const activePanel = document.querySelector('.panel.active');
         if(activePanel.id === 'statsPanel' && typeof window.renderAllStats === 'function') {
             window.renderAllStats();
         }
+    if(typeof window.jumpToSpecificEvent === 'function') window.jumpToSpecificEvent();
     }
     };
 window.createEvent = function() {
@@ -822,7 +827,7 @@ window.renderBungaeJangSelect = function() {
         const mCount = list.length - fCount;
 
         html += `
-        <div class="input-box" style="border-left:10px solid ${ev.mode==='regular'?'#6741d9':'#f08c00'}; padding:18px; margin-bottom:25px; border-radius:15px; box-shadow:0 6px 15px rgba(0,0,0,0.06);">
+        <div id="event_${ev.id}" class="input-box" style="border-left:10px solid ${ev.mode==='regular'?'#6741d9':'#f08c00'}; padding:18px; ...;">
             
             <div style="margin-bottom:15px;">
                 <div style="font-size:0.85rem; color:#888;">${ev.date}</div>
@@ -849,6 +854,10 @@ window.renderBungaeJangSelect = function() {
                     </button>
                     
                     ${hasPower ? `
+                        <button style="${commonBtnStyle} background:#fcc419; color:#3e2723;" 
+        onclick="window.copyKakaoLink('${id}', '${ev.date}', '${ev.mode}')">
+    카톡공지 🔗
+</button>
                         <button style="${commonBtnStyle} background:#6741d9; color:white;" 
                             onclick="window.activateSelectedEventDirect('${id}')">
                             게임시작 🚀
@@ -2660,7 +2669,32 @@ window.silentSave = function() {
         console.log("자동 저장 완료 (조용함)");
     });
 };
+// 카톡용 링크 복사 함수
+window.copyKakaoLink = function(id, date, mode) {
+    const modeK = mode === 'regular' ? '⚖️정기모임' : '⚡번개모임';
+    const jumpUrl = `https://beumjookim.github.io/ilsanacebc/index.html?eventId=${id}`;
+    const text = `🎳 [일산 에이스] 모임 안내\n\n📅 일시: ${date}\n${modeK}\n\n👇 아래 링크를 누르면 바로 신청 화면으로 이동합니다!\n${jumpUrl}`;
+    
+    navigator.clipboard.writeText(text).then(() => {
+        alert("✅ 카톡용 공지 문구가 복사되었습니다!\n대화방에 붙여넣기(Ctrl+V) 하세요.");
+    });
+};
 
+// 특정 이벤트로 자동 스크롤 점프 함수
+window.jumpToSpecificEvent = function() {
+    const targetId = sessionStorage.getItem('jumpToEvent');
+    if (!targetId) return;
+
+    setTimeout(() => {
+        const element = document.getElementById('event_' + targetId);
+        if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            element.style.border = "3px solid #fcc419"; // 반짝 강조
+            setTimeout(() => { element.style.border = "none"; }, 3000);
+            sessionStorage.removeItem('jumpToEvent'); // 점프 후 기억 삭제
+        }
+    }, 1000);
+};
 
 </script>
 </body>
