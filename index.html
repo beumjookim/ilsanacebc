@@ -274,10 +274,7 @@ html, body {
         <button id="logoutBtn" onclick="window.logout()" style="padding:6px 12px; background:var(--danger); color:white; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">로그아웃</button>
     </div>
 </div>
-<a id="kakaotalk-sharing-btn" href="javascript:shareMessage()">
-  <img src="https://developers.kakao.com/assets/img/about/logos/kakaotalksharing/kakaotalk_sharing_btn_medium.png"
-    alt="카카오톡 공유 보내기" />
-</a>
+
         <div class="tab-menu" id="mainTabMenu">
             <button class="tab-btn active" onclick="window.showPanel('attendPanel', this)">1.참석</button>
             <button class="tab-btn" onclick="window.showPanel('groupPanel', this)">2.조편성</button>
@@ -2704,6 +2701,11 @@ window.jumpToSpecificEvent = function() {
         }
     }, 1000);
 };
+// 1. 카카오 열쇠(키) 꽂기 
+if (!Kakao.isInitialized()) {
+    // 👇 관리자님이 복사한 'JavaScript 키'를 여기에 넣으세요!
+    Kakao.init('fa7a8ba02d5835b0aa4183eac217cb7a'); 
+}
 function shareMessage() {
     Kakao.Share.sendDefault({
       objectType: 'feed',
