@@ -115,16 +115,57 @@ html, body {
         .section-title { font-size: 1.1rem; font-weight: bold; color: var(--primary); margin: 20px 0 10px 0; border-left: 4px solid var(--accent); padding-left: 10px; }
         
         #landingPage, #globalLoginScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, #0f2027, #203a43, #2c5364); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 99999; color: white; }
-        .enter-btn { margin-top: 40px; padding: 15px 50px; font-size: 1.2rem; font-weight: bold; color: white; background: rgba(255,255,255,0.1); border: 2px solid white; border-radius: 50px; cursor: pointer; }
+        .enter-btn {
+    margin-top: 40px;
+    padding: 15px 50px;
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: white;
+    background: rgba(255,255,255,0.1);
+    border: 2px solid white;
+    border-radius: 50px;
+    cursor: pointer;
+
+    /* ★ 아래 3줄을 꼭 추가하세요! (납작해짐 방지 & 중앙 정렬) ★ */
+    max-height: none !important;  /* 높이 제한 풀기 */
+    display: flex;                /* 유연한 박스로 변경 */
+    align-items: center;          /* 세로 정중앙 맞춤 */
+}
         
         .login-card { background: white; padding: 30px; border-radius: 15px; width: 80%; max-width: 350px; text-align: center; color: #333; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
         .login-input { width: 100%; padding: 12px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
         
         /* 컨트롤 메뉴 */
-        .control-top-container { display: flex; gap: 8px; margin-bottom: 15px; }
+        /* 카지노 배정 버튼 (특정 위치의 버튼만 조절) */
+.control-top-container .universal-btn {
+    font-size: 0.9rem !important; /* 글씨 크기 축소 */
+    padding: 10px !important;    /* 구역 버튼과 비슷한 느낌으로 패딩 조절 */
+}
         .box-manager { flex: 1; background: #e3f2fd; border: 2px solid #90caf9; color: #1565c0; padding: 10px; border-radius: 8px; text-align: center; font-weight: bold; display: flex; flex-direction: column; justify-content: center; }
-        .btn-run-v13 { flex: 1.2; background: #2980b9; color: white; border: none; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
-        .btn-reset-v13 { flex: 0.8; background: white; color: #c0392b; border: 2px solid #c0392b; border-radius: 8px; font-size: 0.9rem; font-weight: bold; cursor: pointer; }
+        /* 일반 배정 버튼 */
+.btn-run-v13 { 
+    flex: 1.2; 
+    background: #2980b9; 
+    color: white; 
+    border: none; 
+    border-radius: 8px; 
+    font-size: 0.9rem !important; /* 글씨 크기 축소 */
+    font-weight: bold; 
+    cursor: pointer; 
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2); 
+}
+
+/* 초기화 버튼 */
+.btn-reset-v13 { 
+    flex: 0.8; 
+    background: white; 
+    color: #c0392b; 
+    border: 2px solid #c0392b; 
+    border-radius: 8px; 
+    font-size: 0.85rem !important; /* 글씨 크기 축소 */
+    font-weight: bold; 
+    cursor: pointer; 
+}
         
         .lane-box-v13 { background: white; border: 1px solid #ccc; border-radius: 8px; padding: 5px; text-align: center; display: flex; flex-direction: column; gap: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
         .lane-label { color: #8e44ad; font-weight: bold; font-size: 0.9rem; margin-bottom: 2px; }      
@@ -254,24 +295,17 @@ html, body {
                     </div>
                 </div>
 
-                <div class="preset-container" style="margin: 20px 0; padding: 12px; background: #fdfdfd; border-radius: 10px; border: 1px dashed #ccc; box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);">
-                    <label style="font-weight:bold; display:block; margin-bottom:10px; color:#2c3e50; font-size:0.9rem;">⚡ 조편성 퀵 자동 설정</label>
-                    <div style="display:flex; gap:6px;">
-                        <button type="button" class="btn-sm" style="flex:1; background:#3498db; color:white; border:none; height:42px; border-radius:6px; font-weight:bold;" onclick="window.applyPreset(2)">2인조</button>
-                        <button type="button" class="btn-sm" style="flex:1; background:#27ae60; color:white; border:none; height:42px; border-radius:6px; font-weight:bold;" onclick="window.applyPreset(3)">3인조</button>
-                        <button type="button" class="btn-sm" style="flex:1; background:#e67e22; color:white; border:none; height:42px; border-radius:6px; font-weight:bold;" onclick="window.applyPreset(4)">4인조</button>
-                    </div>
-                </div>
+                
 
                 <label style="font-weight:bold; color:var(--primary); display:block; margin-bottom:5px;">2. 참석 현황 및 레인 배정</label>
                 <hr style="border:0; border-top:1px solid #eee; margin:10px 0;">
-                <label style="font-weight:bold; color:#27ae60; display:block; margin-bottom:5px;">2-1. 조편성 방식 선택</label>
-                <select id="groupAssignMethod" class="big-select" style="margin-bottom:15px;" onchange="window.changeAssignMethod(this.value)">
-                    <option value="ai">🤖 AI 밸런스</option>
-                    <option value="random">🎲 랜덤 (무작위)</option>
-                </select>
+                <label style="font-weight:bold; color:#27ae60; display:block; margin-bottom:5px;">1. 조편성 방식 선택</label>
+<select id="groupAssignMethod" class="big-select" style="margin-bottom:15px;" onchange="window.changeAssignMethod(this.value)">
+    <option value="ai">🤖 AI 밸런스</option>
+    <option value="random">🎲 랜덤 (무작위)</option>
+</select>
 
-                <label style="font-weight:bold; color:#8e44ad; display:block; margin-bottom:8px;">3. 레인별 인원 설정</label>
+<label style="font-weight:bold; color:#8e44ad; display:block; margin-bottom:8px;">2. 레인별 인원 설정</label>
                 <div class="control-top-container">
                     <div class="box-manager">
                         <span style="font-size:0.8rem; opacity:0.8;">👑 정모장</span>
@@ -1309,38 +1343,6 @@ window.renderTodayTotalRank = function() {
     for(let k in laneSettings) if(k.startsWith('cnt_')) t += (parseInt(laneSettings[k]) || 0);
     const totalArea = document.getElementById('totalConfigCount');
     if(totalArea) totalArea.innerText = t;
-};
-window.applyPreset = function(size) {
-    if (selectedBlocks.length === 0) return alert("먼저 구역을 선택해주세요!");
-    if (attendees.length === 0) return alert("참석자가 없습니다.");
-
-    const total = attendees.length;
-    const teamCount = Math.ceil(total / size); 
-    let currentLaneIdx = 0;
-    let newSettings = {};
-
-    const lanes = [];
-    selectedBlocks.sort((a,b)=>a-b).forEach(z => {
-        const start = (z - 1) * 4 + 3;
-        for(let i=0; i<4; i++) lanes.push(start + i);
-    });
-
-    for (let t = 1; t <= teamCount; t++) {
-        for (let p = 0; p < size; p++) {
-            if (currentLaneIdx >= lanes.length) break;
-            const lane = lanes[currentLaneIdx];
-            newSettings['cnt_' + lane] = (newSettings['cnt_' + lane] || 0) + 1;
-            newSettings['team_' + lane] = t; 
-            currentLaneIdx++;
-        }
-    }
-
-    laneSettings = newSettings; 
-
-    db.ref('bowling_v14/laneSettings').set(newSettings).then(() => {
-        alert(`✅ ${size}인조 자동 설정 완료!\n총 ${teamCount}개 팀이 배정되었습니다.`);
-        window.renderCustomLaneConfig(); 
-    });
 };
 
 window.updateConfig = function(k, v) { 
