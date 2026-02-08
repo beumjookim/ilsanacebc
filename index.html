@@ -2701,19 +2701,26 @@ window.jumpToSpecificEvent = function() {
         }
     }, 1000);
 };
-// 1. 카카오 열쇠(키) 꽂기 
+// --- 여기부터 파일 끝까지 복사해서 붙여넣으세요 ---
+
+  // 1. 카카오 열쇠(키) 꽂기 
   try {
     if (typeof Kakao !== 'undefined' && !Kakao.isInitialized()) {
       Kakao.init('fa7a8ba02d5835b0aa4183eac217cb7a'); 
       console.log("카카오 초기화 성공");
     }
   } catch (e) {
-    console.log("카카오 초기화 체크 중...");
+    console.log("초기화 체크 중");
   }
 
-  // 2. 카카오톡 공유 기능
+  // 2. 카카오톡 공유 기능 (깔끔하게 하나로 합침)
   function shareMessage() {
     try {
+      if (typeof Kakao === 'undefined') {
+        alert("카카오 프로그램을 찾을 수 없습니다. 페이지를 새로고침해 보세요.");
+        return;
+      }
+      
       if (!Kakao.isInitialized()) {
         Kakao.init('fa7a8ba02d5835b0aa4183eac217cb7a');
       }
@@ -2742,6 +2749,6 @@ window.jumpToSpecificEvent = function() {
     }
   }
 
-</script>  
+</script> 
 </body>
 </html>
