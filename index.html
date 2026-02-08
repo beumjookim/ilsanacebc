@@ -2713,12 +2713,29 @@ try {
 
 // 2. 카카오톡 공유 기능
 function shareMessage() {
+    // 1. 카카오 초기화 및 상세 에러 확인
+try {
+    if (typeof Kakao === 'undefined') {
+        alert("카카오 라이브러리가 로드되지 않았습니다. 인터넷 연결을 확인하세요.");
+    } else {
+        if (!Kakao.isInitialized()) {
+            // 여기에 관리자님의 JavaScript 키를 정확히 넣으세요
+            Kakao.init('fa7a8ba02d5835b0aa4183eac217cb7a');
+            console.log("카카오 초기화 성공");
+        }
+    }
+} catch (e) {
+    // 💡 여기서 뜨는 영어 메시지가 중요합니다! (예: Illegal argument, Domain mismatch 등)
+    alert("카카오 초기화 상세 에러: " + e.message);
+}
+
+// 2. 카카오톡 공유 기능
+function shareMessage() {
     try {
         if (!Kakao.isInitialized()) {
-            alert("카카오 키가 아직 설정되지 않았습니다.");
+            alert("초기화 실패 상태입니다. 설정을 확인하세요.");
             return;
         }
-        
         Kakao.Share.sendDefault({
             objectType: 'feed',
             content: {
@@ -2730,18 +2747,16 @@ function shareMessage() {
                     webUrl: 'https://beumjookim.github.io/ilsanacebc/',
                 },
             },
-            buttons: [
-                {
-                    title: '참석 버튼 누르기',
-                    link: {
-                        mobileWebUrl: 'https://beumjookim.github.io/ilsanacebc/',
-                        webUrl: 'https://beumjookim.github.io/ilsanacebc/',
-                    },
+            buttons: [{
+                title: '참석 버튼 누르기',
+                link: {
+                    mobileWebUrl: 'https://beumjookim.github.io/ilsanacebc/',
+                    webUrl: 'https://beumjookim.github.io/ilsanacebc/',
                 },
-            ],
+            }],
         });
     } catch (e) {
-        alert("공유하기 실행 에러: " + e.message);
+        alert("공유하기 에러 상세: " + e.message);
     }
 }
 </script>
