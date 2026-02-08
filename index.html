@@ -307,18 +307,27 @@ html, body {
 
 <label style="font-weight:bold; color:#8e44ad; display:block; margin-bottom:8px;">2. 레인별 인원 설정</label>
                 <div class="control-top-container">
-                    <div class="box-manager">
-                        <span style="font-size:0.8rem; opacity:0.8;">👑 정모장</span>
-                        <span id="displayJungmoName">미정</span>
-                    </div>
-                    
-                    <button class="btn-run-v13" onclick="window.runGeneralAssignment()">⚖️ 일반 배정</button>
-                    
-                    <button class="universal-btn" style="background:#f39c12; flex:1; margin-bottom:0;" 
-                            onclick="window.startCasinoAssignment()">🎰 카지노 배정</button>
-                            
-                    <button class="btn-reset-v13" onclick="window.resetAssignment()">🗑️ 초기화</button>
-                </div>
+                    <div class="box-manager" style="background:#e8f4fc; border:1px solid #3498db; color:#2980b9; padding:8px; border-radius:6px; text-align:center; font-size:0.9rem; font-weight:bold; margin-bottom:5px; display:block;">
+    <span style="font-size:0.8rem; opacity:0.8; margin-right:5px;">👑 정모장:</span>
+    <span id="displayJungmoName">미정</span>
+</div>
+
+<div style="display:flex; gap:6px; margin-bottom:15px;">
+    <button type="button" onclick="window.runGeneralAssignment()" 
+            style="flex:1; height:38px; background:#3498db; color:white; border:none; border-radius:6px; font-weight:bold; font-size:0.9rem; cursor:pointer; padding:0; box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+        ⚖️ 일반 배정
+    </button>
+
+    <button type="button" onclick="window.startCasinoAssignment()" 
+            style="flex:1; height:38px; background:#e67e22; color:white; border:none; border-radius:6px; font-weight:bold; font-size:0.9rem; cursor:pointer; padding:0; box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+        🎰 카지노
+    </button>
+
+    <button type="button" onclick="window.resetAssignment()" 
+            style="flex:1; height:38px; background:white; border:1px solid #c0392b; color:#c0392b; border-radius:6px; font-weight:bold; font-size:0.9rem; cursor:pointer; padding:0; box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+        🗑️ 초기화
+    </button>
+</div>
                 <div id="laneConfigArea" class="lane-config-grid"></div>
                 <div style="text-align:right; font-weight:bold; margin-top:10px;">
                     설정 인원 합계: <span id="totalConfigCount" style="color:var(--danger); font-size:1.1rem;">0</span>명
