@@ -2782,27 +2782,31 @@ function toggleNoticePanel() {
 // 2. 입력한 내용으로 카톡 보내기
 function sendNotice() {
     var title = document.getElementById('noticeTitle').value || '일산 에이스 볼링 클럽';
-    var desc = document.getElementById('noticeDesc').value || '새로운 공지가 있습니다.';
-    var link = document.getElementById('noticeLink').value.trim();
+    var desc = document.getElementById('noticeDesc').value || '새로운 공지사항이 등록되었습니다.';
+    var linkInput = document.getElementById('noticeLink').value.trim();
 
-    // [중요] 주소 앞에 http가 없으면 자동으로 붙여주는 기능
-    if (link && !link.startsWith('http')) {
-        link = 'https://' + link;
+    // [핵심 수정] 링크가 비어있으면 우리 '진짜 주소'를 강제로 집어넣습니다.
+    var finalLink = linkInput ? linkInput : 'https://beumjookim.github.io/ilsanacebc/';
+
+    // 주소 앞에 http가 없으면 붙여주는 안전장치
+    if (finalLink && !finalLink.startsWith('http')) {
+        finalLink = 'https://' + finalLink;
     }
-    
-    // 링크가 아예 비어있으면 우리 앱 주소로!
-    if (!link) link = window.location.href;
 
     try {
+        if (!Kakao.isInitialized()) {
+            Kakao.init('fa7a8ba02d5835b0aa4183eac217cb7a'); //
+        }
+
         Kakao.Share.sendDefault({
             objectType: 'feed',
             content: {
                 title: title,
                 description: desc,
                 imageUrl: 'https://beumjookim.github.io/ilsanacebc/logo.jpg',
-                link: { mobileWebUrl: link, webUrl: link }
+                link: { mobileWebUrl: finalLink, webUrl: finalLink }
             },
-            buttons: [{ title: '내용 확인하기', link: { mobileWebUrl: link, webUrl: link } }]
+            buttons: [{ title: '내용 확인하기', link: { mobileWebUrl: finalLink, webUrl: finalLink } }]
         });
     } catch (e) {
         alert("카톡 전송 실패: " + e.message);
