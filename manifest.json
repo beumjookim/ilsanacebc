@@ -1,20 +1,20 @@
-{{
-  "name": "Ace Bowling",
-  "short_name": "AceBowling",
+{
+  "name": "일산 에이스 볼링 클럽",
+  "short_name": "에이스볼링",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#3498db",
   "icons": [
     {
-      "src": "./ace.png",
+      "src": "logo.jpg",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/jpeg"
     },
     {
-      "src": "./ace512.png",
+      "src": "logo.jpg",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/jpeg"
     }
   ]
 }
