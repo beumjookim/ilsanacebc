@@ -288,11 +288,18 @@ html, body {
     </div>
 </div>
 
-<div id="admin-notice-panel" style="display:none; position:fixed; top:20%; left:10%; right:10%; background:white; z-index:9999; border:2px solid black; padding:20px;">
-    <h3>📢 공지사항 작성</h3>
-    <input type="text" id="noticeTitle" placeholder="제목">
-    <textarea id="noticeDesc" placeholder="내용"></textarea>
-    <input type="text" id="noticeLink" placeholder="링크(선택)">
+<div id="admin-notice-panel" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:300px; background:white; z-index:9999; border:2px solid #FFEB33; padding:20px; border-radius:15px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+    <h3 style="margin-top:0;">📢 공지사항 작성</h3>
+    
+    <input type="text" id="noticeTitle" placeholder="제목" style="width:100%; margin-bottom:10px;">
+    <textarea id="noticeDesc" placeholder="내용" style="width:100%; height:80px; margin-bottom:10px;"></textarea>
+    <input type="text" id="noticeLink" placeholder="링크(선택)" style="width:100%; margin-bottom:15px;">
+    
+    <div style="display:flex; gap:10px;">
+        <button onclick="sendNotice()" style="flex:1; background:#FFEB33; border:none; padding:10px; border-radius:5px; font-weight:bold;">전송</button>
+        <button onclick="document.getElementById('admin-notice-panel').style.display='none'" style="flex:1; background:#eee; border:none; padding:10px; border-radius:5px;">닫기</button>
+    </div>
+</div>
     
     <button onclick="sendNotice()">전송하기</button>
     <button onclick="toggleNoticePanel()">닫기</button>
@@ -2817,6 +2824,8 @@ function sendNotice() {
             },
             buttons: [{ title: '내용 확인하기', link: { mobileWebUrl: finalLink, webUrl: finalLink } }]
         });
+    alert("공지가 전송되었습니다!"); // 성공 메시지
+        document.getElementById('admin-notice-panel').style.display = 'none'; // 창 숨기기
     } catch (e) {
         alert("카톡 전송 실패: " + e.message);
     }
