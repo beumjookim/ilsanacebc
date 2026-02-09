@@ -271,23 +271,9 @@ html, body {
                  alt="카톡 공유" style="width: 32px; height: 32px; cursor: pointer;">
         </a>
         
-        <button onclick="toggleNoticePanel()" style="padding:6px 12px; background:#FFEB33; color:#3c1e1e; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">📢공지</button>
-
         <span id="userInfo" style="font-weight:bold; color:var(--primary); font-size:0.9rem;"></span>
         <button id="logoutBtn" onclick="window.logout()" style="padding:6px 12px; background:var(--danger); color:white; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">로그아웃</button>
     </div>
-</div>
-
-<div id="admin-notice-panel" style="display:none; background:#ffffff; border:2px solid #FFEB33; padding:15px; margin:10px; border-radius:10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
-    <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-        <h4 style="margin:0; color:#333;">📢 실시간 카톡 공지 발송</h4>
-        <button onclick="toggleNoticePanel()" style="background:none; border:none; font-size:1.5rem; cursor:pointer; line-height:1;">&times;</button>
-    </div>
-    <input type="text" id="noticeTitle" placeholder="제목 (예: 2월 정기전 안내)" style="width:100%; padding:10px; margin-bottom:8px; border:1px solid #ddd; border-radius:5px; box-sizing:border-box;">
-    <textarea id="noticeDesc" placeholder="내용을 입력하세요 (예: 이번주 금요일 8시! 필참!)" style="width:100%; height:80px; padding:10px; margin-bottom:8px; border:1px solid #ddd; border-radius:5px; box-sizing:border-box; resize:none;"></textarea>
-    <input type="text" id="noticeLink" placeholder="상세 링크 (비워두면 앱 주소로 연결)" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ddd; border-radius:5px; box-sizing:border-box;">
-    <button onclick="sendNotice()" style="width:100%; background:#3c1e1e; color:#FFEB33; padding:12px; border:none; border-radius:5px; font-weight:bold; cursor:pointer; font-size:1rem;">🚀 카톡으로 공지 쏘기</button>
-</div>
 </div>
 
         <div class="tab-menu" id="mainTabMenu">
@@ -2763,55 +2749,7 @@ window.jumpToSpecificEvent = function() {
       alert("카톡 실행 실패: " + e.message);
     }
   }
-// ==========================================
-// 📢 [추가] 관리자 공지 발송 기능
-// ==========================================
 
-// 1. 공지창 열고 닫기 (토글)
-function toggleNoticePanel() {
-    var panel = document.getElementById('admin-notice-panel');
-    if (panel.style.display === 'none') {
-        panel.style.display = 'block';
-        // 창 열릴 때 제목 칸에 커서 자동 위치
-        document.getElementById('noticeTitle').focus();
-    } else {
-        panel.style.display = 'none';
-    }
-}
-
-// 2. 입력한 내용으로 카톡 보내기
-function sendNotice() {
-    var title = document.getElementById('noticeTitle').value || '일산 에이스 볼링 클럽';
-    var desc = document.getElementById('noticeDesc').value || '새로운 공지사항이 등록되었습니다.';
-    var linkInput = document.getElementById('noticeLink').value.trim();
-
-    // [핵심 수정] 링크가 비어있으면 우리 '진짜 주소'를 강제로 집어넣습니다.
-    var finalLink = linkInput ? linkInput : 'https://beumjookim.github.io/ilsanacebc/';
-
-    // 주소 앞에 http가 없으면 붙여주는 안전장치
-    if (finalLink && !finalLink.startsWith('http')) {
-        finalLink = 'https://' + finalLink;
-    }
-
-    try {
-        if (!Kakao.isInitialized()) {
-            Kakao.init('fa7a8ba02d5835b0aa4183eac217cb7a'); //
-        }
-
-        Kakao.Share.sendDefault({
-            objectType: 'feed',
-            content: {
-                title: title,
-                description: desc,
-                imageUrl: 'https://beumjookim.github.io/ilsanacebc/logo.jpg',
-                link: { mobileWebUrl: finalLink, webUrl: finalLink }
-            },
-            buttons: [{ title: '내용 확인하기', link: { mobileWebUrl: finalLink, webUrl: finalLink } }]
-        });
-    } catch (e) {
-        alert("카톡 전송 실패: " + e.message);
-    }
-}
 </script> 
 </body>
 </html>
