@@ -250,7 +250,12 @@ html, body {
         <p style="color:#eee; font-weight:bold;">V18.0</p>
         <button class="enter-btn" onclick="window.showGlobalLogin()">앱 시작하기</button>
     </div>
+<div id="admin-menu" style="display: none; background: #f0f0f0; padding: 10px; text-align: center; border-bottom: 1px solid #ccc;">
+        <button onclick="sendKakao()" style="background: #fee500; border: none; padding: 5px 10px; border-radius: 5px;">카톡 전송</button>
+        <button onclick="writeNotice()" style="background: #007bff; color: white; border: none; padding: 5px 10px; border-radius: 5px;">공지 작성</button>
+    </div>
 
+    <div id="main-content">
     <div id="globalLoginScreen" style="display:none;">
         <div class="login-card">
             <h2 style="color:var(--primary); margin-bottom:20px;">🔐 회원 로그인</h2>
