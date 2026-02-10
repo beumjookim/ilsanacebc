@@ -1476,118 +1476,158 @@ window.getWeightedStats = function(name) {
 
 // 2. [배정 엔진] 5인조 고정, 지그재그 레인, 자동 페이지 이동
 window.runAssignment = function() {
+    console.log("🚀 배정 엔진 시동...");
+
     try {
-        // 1. [기초 검사] 구역과 참석자 확인
-        if (!selectedBlocks || selectedBlocks.length === 0) {
-            return alert("❌ [1. 구역 선택] 버튼을 먼저 눌러주세요! (1구역, 2구역 등)");
+        // 1. [데이터 소독] selectedBlocks가 이상하게(null 포함) 들어올 경우를 대비해 청소합니다.
+        // 배열이 아니거나 비어있으면 빈 배열로 처리
+        let safeBlocks = [];
+        if (Array.isArray(selectedBlocks)) {
+            safeBlocks = selectedBlocks.filter(n => n !== null && n !== undefined && n !== "");
+        }
+        
+        // 2. [기초 검사]
+        if (safeBlocks.length === 0) {
+            return alert("❌ [1. 구역 선택] 버튼을 눌러 구역을 활성화해주세요.");
         }
         if (!attendees || attendees.length === 0) {
-            return alert("❌ [참석자]가 없습니다. 참석 체크를 먼저 해주세요!");
+            return alert("❌ [참석자] 명단이 비어있습니다.");
         }
 
-        // 2. [정렬] 참석자 줄 세우기
+        // 3. [레인 쌍 생성] 안전한 safeBlocks만 사용
+        let lanePairs = [];
+        safeBlocks.sort((a, b) => a - b).forEach(z => {
+            let zoneNum = parseInt(z);
+            if (!isNaN(zoneNum)) {
+                lanePairs.push([(zoneNum-1)*4+3, (zoneNum-1)*4+4], [(zoneNum-1)*4+5, (zoneNum-1)*4+6]);
+            }
+        });
+
+        const T = lanePairs.length; // 팀 수
+        if (T === 0) return alert("❌ 계산된 레인 정보가 없습니다. 구역 설정을 확인해주세요.");
+
+        // 4. [참석자 정렬]
         const rankingList = attendees
-            .filter(n => !n.includes("고스트"))
+            .filter(n => n && !n.includes("고스트"))
             .map(name => {
-                // 혹시 getWeightedStats 함수가 없으면 0점 처리
-                const stats = (typeof window.getWeightedStats === 'function') 
-                    ? window.getWeightedStats(name) 
-                    : { weightedAvg: 0 }; 
-                return { name: name.trim(), avg: stats.weightedAvg, isGhost: false };
+                const stats = (typeof window.getWeightedStats === 'function') ? window.getWeightedStats(name) : { weightedAvg: 0 };
+                return { name: name.trim(), avg: stats.weightedAvg || 0, isGhost: false };
             })
             .sort((a, b) => b.avg - a.avg);
 
-        // 20명 채우기 (고스트)
-        while(rankingList.length < 20) {
+        // 인원 채우기 (팀당 5명)
+        const targetTotal = T * 5;
+        while(rankingList.length < targetTotal) {
             rankingList.push({ name: "👻고스트", avg: 0, isGhost: true });
         }
 
-        // 3. [그룹 분리]
-        let top4 = rankingList.slice(0, 4).sort(() => Math.random() - 0.5);
-        let next4 = rankingList.slice(4, 8); // 매칭 대상
-        let others = rankingList.slice(8, 20);
+        // 5. [그룹 분리]
+        let topT = rankingList.slice(0, T).sort(() => Math.random() - 0.5);
+        let nextT = rankingList.slice(T, T * 2);
+        let others = rankingList.slice(T * 2);
 
-        let teamCount = 4;
         let finalTeams = [];
-        for(let i=0; i<teamCount; i++) {
-            finalTeams.push({ teamNo: i + 1, members: [], totalAvg: 0, matchHandy: 0 });
+        for(let i=0; i<T; i++) {
+            finalTeams.push({ teamNo: i + 1, members: [], totalAvg: 0 });
         }
 
-        let lanePairs = [];
-        selectedBlocks.sort((a,b)=>a-b).forEach(z => { 
-            lanePairs.push([(z-1)*4+3, (z-1)*4+4], [(z-1)*4+5, (z-1)*4+6]); 
+        // 6. [히스토리 안전 로딩] (여기서 에러가 많이 납니다. 안전장치 추가)
+        const historyData = window.regularHistoryCache || {};
+        const history = Object.values(historyData)
+            .filter(h => h && h.gameTeams) // 데이터가 깨진 기록은 제외
+            .sort((a, b) => (b.date || "").localeCompare(a.date || ""))
+            .slice(0, 3);
+
+        // 7. [좌측 기둥 배치]
+        topT.forEach((player, i) => {
+            // lanePairs[i]가 존재하는지 반드시 확인
+            if (lanePairs[i]) {
+                player.lane = lanePairs[i][0];
+                finalTeams[i].members.push(player);
+                finalTeams[i].totalAvg += player.avg;
+            }
         });
 
-        // 4. [히스토리 안전 로딩] 여기가 범인일 가능성이 높습니다!
-        // window.regularHistoryCache가 없어도 에러가 안 나게 빈 객체 {}를 줍니다.
-        const historyData = (window.regularHistoryCache) ? window.regularHistoryCache : {};
-        const history = Object.values(historyData).sort((a,b)=>b.date.localeCompare(a.date)).slice(0, 3);
-
-        // 5. [좌우 기둥 매칭]
-        top4.forEach((player, i) => {
-            player.lane = lanePairs[i][0];
-            finalTeams[i].members.push(player);
-            finalTeams[i].totalAvg += player.avg;
-        });
-
-        next4.sort(() => Math.random() - 0.5);
-        next4.forEach(rPlayer => {
+        // 8. [우측 기둥 배치] (중복 방지)
+        nextT.sort(() => Math.random() - 0.5);
+        nextT.forEach(rPlayer => {
             let bestTeam = null;
             let minOverlap = 999;
 
-            finalTeams.filter(t => t.members.length === 1).forEach(team => {
+            const candidates = finalTeams.filter(t => t.members.length === 1);
+            
+            candidates.forEach(team => {
                 let overlapCount = 0;
                 const lPlayer = team.members[0];
+
                 history.forEach(past => {
-                    const wasTogether = (past.gameTeams[1] || []).some(pt => 
-                        pt.members.some(m => m.name === lPlayer.name) && 
-                        pt.members.some(m => m.name === rPlayer.name)
-                    );
-                    if(wasTogether) overlapCount++;
+                    // 과거 데이터 구조가 바뀌었을 수도 있으니 안전하게 접근
+                    const pastTeams = past.gameTeams[1] || past.gameTeams["1"] || [];
+                    if (Array.isArray(pastTeams)) {
+                        const wasTogether = pastTeams.some(pt => 
+                            pt.members &&
+                            pt.members.some(m => m.name === lPlayer.name) && 
+                            pt.members.some(m => m.name === rPlayer.name)
+                        );
+                        if(wasTogether) overlapCount++;
+                    }
                 });
-                if(overlapCount < minOverlap) { minOverlap = overlapCount; bestTeam = team; }
+
+                if(overlapCount < minOverlap) {
+                    minOverlap = overlapCount;
+                    bestTeam = team;
+                }
             });
-            
-            rPlayer.lane = lanePairs[bestTeam.teamNo-1][1];
-            bestTeam.members.push(rPlayer);
-            bestTeam.totalAvg += rPlayer.avg;
+
+            // 만약 계산 실패시 첫번째 팀에라도 넣음 (비상조치)
+            if (!bestTeam && candidates.length > 0) bestTeam = candidates[0];
+
+            if (bestTeam) {
+                const laneIdx = bestTeam.teamNo - 1;
+                if (lanePairs[laneIdx]) {
+                    rPlayer.lane = lanePairs[laneIdx][1];
+                    bestTeam.members.push(rPlayer);
+                    bestTeam.totalAvg += rPlayer.avg;
+                }
+            }
         });
 
-        // 6. [나머지 배정]
+        // 9. [나머지 인원 배치]
         const shuffleOthers = (players, teams) => {
             players.sort(() => Math.random() - 0.5);
             players.forEach(player => {
-                if(player.isGhost) {
-                    let t = teams.find(t => t.members.length < 5);
-                    if(t) t.members.push(player);
-                    return;
-                }
+                let available = teams.filter(t => t.members.length < 5);
+                if (available.length === 0) return;
 
                 let bestTeam = null;
                 let minOverlap = 999;
-                teams.filter(t => t.members.length < 5).forEach(team => {
+
+                available.forEach(team => {
                     let overlapCount = 0;
                     history.forEach(past => {
-                        const pastTeam = (past.gameTeams[1] || []).find(pt => pt.members.some(m => m.name === player.name));
-                        if(pastTeam) {
-                            const pastMemberNames = pastTeam.members.map(m => m.name);
-                            team.members.forEach(m => { if(pastMemberNames.includes(m.name)) overlapCount++; });
+                        const pastTeams = past.gameTeams[1] || past.gameTeams["1"] || [];
+                        if (Array.isArray(pastTeams)) {
+                            const pastTeam = pastTeams.find(pt => pt.members && pt.members.some(m => m.name === player.name));
+                            if(pastTeam) {
+                                const pastMembers = pastTeam.members.map(m => m.name);
+                                team.members.forEach(m => { if(pastMembers.includes(m.name)) overlapCount++; });
+                            }
                         }
                     });
                     if(overlapCount < minOverlap) { minOverlap = overlapCount; bestTeam = team; }
                 });
-                if(bestTeam) {
-                    bestTeam.members.push(player);
-                    bestTeam.totalAvg += player.avg;
-                }
+
+                if (!bestTeam) bestTeam = available[0];
+                bestTeam.members.push(player);
+                bestTeam.totalAvg += player.avg;
             });
         };
-
         shuffleOthers(others, finalTeams);
 
-        // 7. [마무리]
+        // 10. [레인 최종 배분]
         finalTeams.forEach((t, i) => {
             const pair = lanePairs[i];
+            if (!pair) return; // 레인 정보 없으면 패스
             let leftCount = 1; 
             t.members.forEach((m, idx) => {
                 if(idx > 1) { 
@@ -1597,25 +1637,20 @@ window.runAssignment = function() {
             });
         });
 
+        // 11. [저장 및 이동]
         const maxAvg = Math.max(...finalTeams.map(t => t.totalAvg));
         finalTeams.forEach(t => t.matchHandy = Math.max(0, Math.round(maxAvg - t.totalAvg)));
-
-        // 전역 변수에 저장
         gameTeams[currentTargetGame] = finalTeams;
 
-        // DB 저장
         db.ref('bowling_v14/gameTeams').set(gameTeams).then(() => {
-            alert(`✅ 배정 완료!`);
+            alert(`✅ 배정 성공! (총 ${T}팀)`);
             currentRankView = currentTargetGame;
             db.ref('bowling_v14/settings').update({ currentTab: 'progressPanel', currentRankView: currentTargetGame });
             window.showPanel('progressPanel', document.querySelectorAll('.tab-btn')[3]);
-        }).catch(err => {
-            alert("❌ DB 저장 실패: " + err.message);
         });
 
     } catch (err) {
-        // 여기가 핵심입니다! 에러가 나면 내용을 알려줍니다.
-        alert("🚨 실행 중 오류 발생:\n" + err.message);
+        alert("🚨 [치명적 오류 발생]\n" + err.message + "\n\n(구역 선택 버튼을 다시 눌렀다가 시도해보세요!)");
         console.error(err);
     }
 };
