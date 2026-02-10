@@ -1614,26 +1614,18 @@ window.renderGameProgress = function() {
 
     window.updateScore = function(n, v) { (gameTeams[currentInputGame]||[]).forEach(t => t.members.forEach(m => { if(m.name===n) m.score = parseInt(v); })); };
     
-// 기존 window.saveAllScores 함수를 찾아서 이걸로 교체하세요!
 window.saveAllScores = function() { 
     db.ref('bowling_v14/gameTeams').set(gameTeams).then(() => {
         
-        alert(`✅ ${currentInputGame}G 점수 저장 완료!`);
+        currentStatsGame = currentInputGame; 
 
-        // ✅ [핵심 수정] 다음 게임 번호를 미리 계산합니다.
-        let nextGame = currentInputGame + 1;
-        // 만약 마지막 게임(4G)이라면 그냥 그대로 둡니다.
-        if (nextGame > settings.gameCount) nextGame = currentInputGame;
-
-        // DB에 "다음엔 이 게임을 조편성할 차례야"라고 알려줍니다.
         db.ref('bowling_v14/settings').update({ 
-            currentTab: 'statsPanel',       // 저장은 했으니 통계 화면으로 가고
-            currentStatsGame: currentInputGame, 
-            currentAssignGame: nextGame,    // ★ 조편성 탭의 목표를 다음 게임으로 변경!
-            currentRankView: currentInputGame
+            currentTab: 'statsPanel',
+            currentStatsGame: currentInputGame 
         });
 
-        // 탭 버튼 활성화 (통계 탭)
+        alert(`✅ ${currentInputGame}G 점수 저장 완료! 실시간 통계 화면으로 이동합니다.`);
+        
         const tabBtns = document.querySelectorAll('.tab-btn');
         if(tabBtns[5]) {
             window.showPanel('statsPanel', tabBtns[5]);
@@ -2076,32 +2068,19 @@ window.renderCasino = function() {
         });
     });
 };
-/* 수정된 엄격한 칩 선택 함수 
-   - 정모장/번개장도 예외 없음! 무조건 자기 색깔만 선택 가능
-   - 오직 '찐 관리자'만 아무거나 선택 가능
-*/
 window.pickChip = function(tier, id) {
     const myTier = window.getMyTier(); 
     const myName = (loggedInUser || "").trim();
-    
-    // ✅ 수정 포인트: '관리자(ace_admin)'만 특권 유지 (정모장/번개장 제외)
-    const isRealAdmin = (localStorage.getItem('ace_admin') === 'true');
+    const isBoss = isAdmin || (managers.jungmo === myName) || (managers.lightning === myName);
 
     db.ref('bowling_v14/casino').once('value', sn => {
         const data = sn.val() || {};
         
-        // ⛔ 여기가 엄격해진 부분입니다!
-        // 진짜 관리자가 아니면, 정모장이든 누구든 가차 없이 검사합니다.
-        if (!isRealAdmin) {
-             if (!myTier) return alert("🚫 명단에 없는 유저입니다. (참석 체크 확인해주세요)");
-             
-             // 내 등급과 선택한 칩의 색깔이 다르면 즉시 차단!
-             if (tier !== myTier) {
-                 return alert(`⚖️ 규칙 준수!\n회원님은 오직 [${myTier.toUpperCase()}] 칩만 선택할 수 있습니다.`);
-             }
+        if (!isBoss) {
+            if (!myTier) return alert("🚫 참석 명단에 이름이 없습니다.");
+            if (tier !== myTier) return alert(`⚖️ 회원님은 [${myTier.toUpperCase()}] 등급 칩만 선택 가능합니다.`);
         }
 
-        // --- 여기서부터는 칩 가져가는 로직 (기존과 동일) ---
         let alreadyPicked = false;
         ['red', 'blue', 'green', 'yellow', 'purple'].forEach(t => {
             if(data[t]) {
@@ -2111,16 +2090,16 @@ window.pickChip = function(tier, id) {
             }
         });
 
-        if(alreadyPicked) return alert("🚫 욕심쟁이! 이미 칩을 하나 선택하셨습니다.");
+        if(alreadyPicked) return alert("🚫 이미 칩을 뽑으셨습니다!");
 
         const chipRef = db.ref(`bowling_v14/casino/${tier}/${id}`);
         chipRef.transaction(current => {
             if(current && current.status === 'idle') {
                 return { ...current, status: 'picked', owner: myName };
             }
-            return; 
+            return;
         }, (err, committed) => {
-            if(!committed) alert("⚠️ 이런! 다른 분이 먼저 채갔습니다. 다른 칩을 노려보세요!");
+            if(!committed) alert("⚠️ 이미 다른 분이 선택했거나 오류가 발생했습니다.");
         });
     }); 
 }; 
