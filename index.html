@@ -1476,182 +1476,106 @@ window.getWeightedStats = function(name) {
 
 // 2. [배정 엔진] 5인조 고정, 지그재그 레인, 자동 페이지 이동
 window.runAssignment = function() {
-    console.log("🚀 배정 엔진 시동...");
-
     try {
-        // 1. [데이터 소독] selectedBlocks가 이상하게(null 포함) 들어올 경우를 대비해 청소합니다.
-        // 배열이 아니거나 비어있으면 빈 배열로 처리
-        let safeBlocks = [];
-        if (Array.isArray(selectedBlocks)) {
-            safeBlocks = selectedBlocks.filter(n => n !== null && n !== undefined && n !== "");
-        }
-        
-        // 2. [기초 검사]
-        if (safeBlocks.length === 0) {
-            return alert("❌ [1. 구역 선택] 버튼을 눌러 구역을 활성화해주세요.");
-        }
-        if (!attendees || attendees.length === 0) {
-            return alert("❌ [참석자] 명단이 비어있습니다.");
-        }
+        console.log("🚀 [절대 복종 모드] 배정 엔진 가동...");
 
-        // 3. [레인 쌍 생성] 안전한 safeBlocks만 사용
-        let lanePairs = [];
-        safeBlocks.sort((a, b) => a - b).forEach(z => {
-            let zoneNum = parseInt(z);
-            if (!isNaN(zoneNum)) {
-                lanePairs.push([(zoneNum-1)*4+3, (zoneNum-1)*4+4], [(zoneNum-1)*4+5, (zoneNum-1)*4+6]);
+        // 1. [진짜 배정할 레인만 추출] 
+        // 구역 버튼(selectedBlocks)은 무시합니다. 오직 숫자가 있는 레인만 찾습니다.
+        let targetLanes = [];
+        let totalCapacity = 0;
+
+        // 1번부터 20번 레인까지 훑어서 '인원(cnt)'과 '팀번호(team)'가 적힌 레인만 수집합니다.
+        for (let l = 1; l <= 20; l++) {
+            let cnt = parseInt(laneSettings['cnt_' + l]) || 0;
+            let team = parseInt(laneSettings['team_' + l]) || 0;
+            
+            if (cnt > 0 && team > 0) {
+                targetLanes.push({ lane: l, cap: cnt, teamNo: team });
+                totalCapacity += cnt;
             }
-        });
+        }
 
-        const T = lanePairs.length; // 팀 수
-        if (T === 0) return alert("❌ 계산된 레인 정보가 없습니다. 구역 설정을 확인해주세요.");
+        // 숫자가 적힌 레인이 하나도 없으면 경고하고 멈춥니다.
+        if (targetLanes.length === 0) {
+            return alert("❌ 오류: [3. 레인별 인원 설정]에 인원수와 팀 번호를 먼저 입력해주세요!");
+        }
 
-        // 4. [참석자 정렬]
+        // 2. [참석자 정렬 및 고스트 생성]
         const rankingList = attendees
             .filter(n => n && !n.includes("고스트"))
-            .map(name => {
-                const stats = (typeof window.getWeightedStats === 'function') ? window.getWeightedStats(name) : { weightedAvg: 0 };
-                return { name: name.trim(), avg: stats.weightedAvg || 0, isGhost: false };
-            })
+            .map(name => ({
+                name: name.trim(),
+                avg: (typeof window.getWeightedStats === 'function') ? window.getWeightedStats(name).weightedAvg : 0
+            }))
             .sort((a, b) => b.avg - a.avg);
 
-        // 인원 채우기 (팀당 5명)
-        const targetTotal = T * 5;
-        while(rankingList.length < targetTotal) {
+        // ★ 핵심: 관리자가 설정한 총 정원(totalCapacity)보다 실제 사람이 적을 때만 고스트를 만듭니다.
+        while(rankingList.length < totalCapacity) {
             rankingList.push({ name: "👻고스트", avg: 0, isGhost: true });
         }
 
-        // 5. [그룹 분리]
+        // 3. [팀 구성] 입력된 팀 번호들에 맞춰 그릇을 만듭니다.
+        const uniqueTeamNos = [...new Set(targetLanes.map(tl => tl.teamNo))].sort((a,b)=>a-b);
+        let finalTeams = uniqueTeamNos.map(tNo => ({
+            teamNo: tNo, members: [], totalAvg: 0, matchHandy: 0
+        }));
+
+        // 4. [좌우 기둥 및 나머지 배치]
+        // 상위권 1그룹(좌측 기둥), 2그룹(우측 기둥) 분리
+        const T = uniqueTeamNos.length;
         let topT = rankingList.slice(0, T).sort(() => Math.random() - 0.5);
         let nextT = rankingList.slice(T, T * 2);
         let others = rankingList.slice(T * 2);
 
-        let finalTeams = [];
-        for(let i=0; i<T; i++) {
-            finalTeams.push({ teamNo: i + 1, members: [], totalAvg: 0 });
-        }
-
-        // 6. [히스토리 안전 로딩] (여기서 에러가 많이 납니다. 안전장치 추가)
-        const historyData = window.regularHistoryCache || {};
-        const history = Object.values(historyData)
-            .filter(h => h && h.gameTeams) // 데이터가 깨진 기록은 제외
-            .sort((a, b) => (b.date || "").localeCompare(a.date || ""))
-            .slice(0, 3);
-
-        // 7. [좌측 기둥 배치]
-        topT.forEach((player, i) => {
-            // lanePairs[i]가 존재하는지 반드시 확인
-            if (lanePairs[i]) {
-                player.lane = lanePairs[i][0];
-                finalTeams[i].members.push(player);
-                finalTeams[i].totalAvg += player.avg;
+        // (1) 좌측 기둥 박기
+        finalTeams.forEach((team, i) => {
+            const myLanes = targetLanes.filter(tl => tl.teamNo === team.teamNo);
+            if (myLanes.length > 0 && topT[i]) {
+                topT[i].lane = myLanes[0].lane; // 해당 팀의 첫 번째 레인에 배치
+                team.members.push(topT[i]);
+                team.totalAvg += topT[i].avg;
             }
         });
 
-        // 8. [우측 기둥 배치] (중복 방지)
-        nextT.sort(() => Math.random() - 0.5);
-        nextT.forEach(rPlayer => {
-            let bestTeam = null;
-            let minOverlap = 999;
-
-            const candidates = finalTeams.filter(t => t.members.length === 1);
-            
-            candidates.forEach(team => {
-                let overlapCount = 0;
-                const lPlayer = team.members[0];
-
-                history.forEach(past => {
-                    // 과거 데이터 구조가 바뀌었을 수도 있으니 안전하게 접근
-                    const pastTeams = past.gameTeams[1] || past.gameTeams["1"] || [];
-                    if (Array.isArray(pastTeams)) {
-                        const wasTogether = pastTeams.some(pt => 
-                            pt.members &&
-                            pt.members.some(m => m.name === lPlayer.name) && 
-                            pt.members.some(m => m.name === rPlayer.name)
-                        );
-                        if(wasTogether) overlapCount++;
-                    }
-                });
-
-                if(overlapCount < minOverlap) {
-                    minOverlap = overlapCount;
-                    bestTeam = team;
-                }
+        // (2) 우측 기둥 및 나머지 순차 배치
+        let allRemaining = [...nextT, ...others];
+        allRemaining.forEach(player => {
+            // 자리가 남은 팀을 찾습니다.
+            let bestTeam = finalTeams.find(t => {
+                const teamCap = targetLanes.filter(tl => tl.teamNo === t.teamNo).reduce((sum, tl) => sum + tl.cap, 0);
+                return t.members.length < teamCap;
             });
-
-            // 만약 계산 실패시 첫번째 팀에라도 넣음 (비상조치)
-            if (!bestTeam && candidates.length > 0) bestTeam = candidates[0];
 
             if (bestTeam) {
-                const laneIdx = bestTeam.teamNo - 1;
-                if (lanePairs[laneIdx]) {
-                    rPlayer.lane = lanePairs[laneIdx][1];
-                    bestTeam.members.push(rPlayer);
-                    bestTeam.totalAvg += rPlayer.avg;
+                // 해당 팀의 레인 중 자리가 남은 레인을 찾습니다.
+                const myLanes = targetLanes.filter(tl => tl.teamNo === bestTeam.teamNo);
+                let targetLaneObj = myLanes.find(lObj => {
+                    const currentCount = bestTeam.members.filter(m => m.lane === lObj.lane).length;
+                    return currentCount < lObj.cap;
+                });
+
+                if (targetLaneObj) {
+                    player.lane = targetLaneObj.lane;
+                    bestTeam.members.push(player);
+                    bestTeam.totalAvg += player.avg;
                 }
             }
         });
 
-        // 9. [나머지 인원 배치]
-        const shuffleOthers = (players, teams) => {
-            players.sort(() => Math.random() - 0.5);
-            players.forEach(player => {
-                let available = teams.filter(t => t.members.length < 5);
-                if (available.length === 0) return;
-
-                let bestTeam = null;
-                let minOverlap = 999;
-
-                available.forEach(team => {
-                    let overlapCount = 0;
-                    history.forEach(past => {
-                        const pastTeams = past.gameTeams[1] || past.gameTeams["1"] || [];
-                        if (Array.isArray(pastTeams)) {
-                            const pastTeam = pastTeams.find(pt => pt.members && pt.members.some(m => m.name === player.name));
-                            if(pastTeam) {
-                                const pastMembers = pastTeam.members.map(m => m.name);
-                                team.members.forEach(m => { if(pastMembers.includes(m.name)) overlapCount++; });
-                            }
-                        }
-                    });
-                    if(overlapCount < minOverlap) { minOverlap = overlapCount; bestTeam = team; }
-                });
-
-                if (!bestTeam) bestTeam = available[0];
-                bestTeam.members.push(player);
-                bestTeam.totalAvg += player.avg;
-            });
-        };
-        shuffleOthers(others, finalTeams);
-
-        // 10. [레인 최종 배분]
-        finalTeams.forEach((t, i) => {
-            const pair = lanePairs[i];
-            if (!pair) return; // 레인 정보 없으면 패스
-            let leftCount = 1; 
-            t.members.forEach((m, idx) => {
-                if(idx > 1) { 
-                    if(leftCount < 3) { m.lane = pair[0]; leftCount++; }
-                    else { m.lane = pair[1]; }
-                }
-            });
-        });
-
-        // 11. [저장 및 이동]
+        // 5. [마무리 및 저장]
         const maxAvg = Math.max(...finalTeams.map(t => t.totalAvg));
         finalTeams.forEach(t => t.matchHandy = Math.max(0, Math.round(maxAvg - t.totalAvg)));
         gameTeams[currentTargetGame] = finalTeams;
 
         db.ref('bowling_v14/gameTeams').set(gameTeams).then(() => {
-            alert(`✅ 배정 성공! (총 ${T}팀)`);
+            alert(`✅ 설정된 ${totalCapacity}명 정원에 맞춰 배정이 완료되었습니다!`);
             currentRankView = currentTargetGame;
             db.ref('bowling_v14/settings').update({ currentTab: 'progressPanel', currentRankView: currentTargetGame });
             window.showPanel('progressPanel', document.querySelectorAll('.tab-btn')[3]);
         });
 
     } catch (err) {
-        alert("🚨 [치명적 오류 발생]\n" + err.message + "\n\n(구역 선택 버튼을 다시 눌렀다가 시도해보세요!)");
-        console.error(err);
+        alert("🚨 실행 중 오류 발생:\n" + err.message);
     }
 };
 
