@@ -1538,11 +1538,20 @@ window.runAssignment = function() {
     });
 
     // 5. 저장 및 화면 전환
-    gameTeams[currentTargetGame] = finalTeams;
+    gameTeams[currentTargetGame] = finalTeams; // finalTeams 변수는 위에서 계산된 결과
+    
     db.ref('bowling_v14/gameTeams').set(gameTeams).then(() => {
         alert(`✅ ${currentTargetGame}G 배정 완료!`);
-        currentRankView = currentTargetGame;
-        // 배정 즉시 [진행] 탭으로 이동
+        
+        // ✅ [핵심 수정] 여기서도 currentRankView를 확실하게 업데이트!
+        currentRankView = currentTargetGame; 
+        
+        db.ref('bowling_v14/settings').update({
+            currentTab: 'progressPanel',
+            currentRankView: currentTargetGame, // ★ 진행 화면을 이 게임으로 고정!
+            currentInputGame: currentTargetGame
+        });
+        
         window.showPanel('progressPanel', document.querySelectorAll('.tab-btn')[3]); 
     });
 };
@@ -1605,18 +1614,26 @@ window.renderGameProgress = function() {
 
     window.updateScore = function(n, v) { (gameTeams[currentInputGame]||[]).forEach(t => t.members.forEach(m => { if(m.name===n) m.score = parseInt(v); })); };
     
+// 기존 window.saveAllScores 함수를 찾아서 이걸로 교체하세요!
 window.saveAllScores = function() { 
     db.ref('bowling_v14/gameTeams').set(gameTeams).then(() => {
         
-        currentStatsGame = currentInputGame; 
+        alert(`✅ ${currentInputGame}G 점수 저장 완료!`);
 
+        // ✅ [핵심 수정] 다음 게임 번호를 미리 계산합니다.
+        let nextGame = currentInputGame + 1;
+        // 만약 마지막 게임(4G)이라면 그냥 그대로 둡니다.
+        if (nextGame > settings.gameCount) nextGame = currentInputGame;
+
+        // DB에 "다음엔 이 게임을 조편성할 차례야"라고 알려줍니다.
         db.ref('bowling_v14/settings').update({ 
-            currentTab: 'statsPanel',
-            currentStatsGame: currentInputGame 
+            currentTab: 'statsPanel',       // 저장은 했으니 통계 화면으로 가고
+            currentStatsGame: currentInputGame, 
+            currentAssignGame: nextGame,    // ★ 조편성 탭의 목표를 다음 게임으로 변경!
+            currentRankView: currentInputGame
         });
 
-        alert(`✅ ${currentInputGame}G 점수 저장 완료! 실시간 통계 화면으로 이동합니다.`);
-        
+        // 탭 버튼 활성화 (통계 탭)
         const tabBtns = document.querySelectorAll('.tab-btn');
         if(tabBtns[5]) {
             window.showPanel('statsPanel', tabBtns[5]);
@@ -1930,25 +1947,28 @@ window.deleteToday = function() {
     window.uploadExcel = function() {
         alert("엑셀 일괄 등록 기능은 현재 개발 준비 중입니다.");
     };
+/* 💾 [저장된 로직 적용] 
+   - 전체 회원이 아닌, '오늘 참석자' 기준 상대평가 
+   - 팀 수(T)에 따라 유동적으로 등급 부여 (절대평가 X)
+*/
 window.getMyTier = function() {
     const myName = (loggedInUser || "").trim();
     if(!myName || !attendees.length) return null;
     
+    // 1. [오늘의 줄 세우기] 참석자만 에버순 정렬
     const rankingList = attendees
         .filter(n => !n.includes("고스트")) 
         .map(name => {
             const stats = window.getWeightedStats(name);
-            return { 
-                name: name.trim(), 
-                avg: parseFloat(stats.weightedAvg) || 0 
-            };
+            return { name: name.trim(), avg: parseFloat(stats.weightedAvg) || 0 };
         });
-
-    rankingList.sort((a, b) => b.avg - a.avg);
+    rankingList.sort((a, b) => b.avg - a.avg); // 1등이 맨 앞
 
     const myRank = rankingList.findIndex(player => player.name === myName);
     if(myRank === -1) return null;
 
+    // 2. [오늘의 커트라인] 팀 수(T) 계산
+    // (레인 설정이 없어도 참석자 수에 맞춰 자동으로 비율을 나눕니다)
     let teamList = [];
     for(let k in laneSettings) {
         if(k.startsWith('team_') && parseInt(laneSettings[k]) > 0) {
@@ -1956,12 +1976,17 @@ window.getMyTier = function() {
         }
     }
     
-    const T = [...new Set(teamList)].length || (selectedBlocks.length * 2) || 2;
+    // 기본적으로 설정된 팀 수를 따르되, 
+    // 설정이 없거나 이상하면 '전체 인원 / 4'로 자동 계산하여 유동성을 줍니다.
+    let T = [...new Set(teamList)].length;
+    if (T < 1) T = Math.ceil(rankingList.length / 4); 
+    if (T < 1) T = 1; // 최소 방어 코드
 
-    if(myRank < T) return 'red';          
-    if(myRank < T * 2) return 'blue';      
-    if(myRank < T * 3) return 'green';     
-    return 'yellow';                       
+    // 3. [상대평가 판정] 내 등수가 커트라인 안쪽인가?
+    if(myRank < T) return 'red';               // 상위 1그룹
+    if(myRank < T * 2) return 'blue';          // 상위 2그룹 (3~4등도 여기 포함됨!)
+    if(myRank < T * 3) return 'green';         // 상위 3그룹
+    return 'yellow';                           // 나머지
 };
 
 window.initCasino = function() {
@@ -2059,19 +2084,32 @@ window.renderCasino = function() {
         });
     });
 };
+/* 수정된 엄격한 칩 선택 함수 
+   - 정모장/번개장도 예외 없음! 무조건 자기 색깔만 선택 가능
+   - 오직 '찐 관리자'만 아무거나 선택 가능
+*/
 window.pickChip = function(tier, id) {
     const myTier = window.getMyTier(); 
     const myName = (loggedInUser || "").trim();
-    const isBoss = isAdmin || (managers.jungmo === myName) || (managers.lightning === myName);
+    
+    // ✅ 수정 포인트: '관리자(ace_admin)'만 특권 유지 (정모장/번개장 제외)
+    const isRealAdmin = (localStorage.getItem('ace_admin') === 'true');
 
     db.ref('bowling_v14/casino').once('value', sn => {
         const data = sn.val() || {};
         
-        if (!isBoss) {
-            if (!myTier) return alert("🚫 참석 명단에 이름이 없습니다.");
-            if (tier !== myTier) return alert(`⚖️ 회원님은 [${myTier.toUpperCase()}] 등급 칩만 선택 가능합니다.`);
+        // ⛔ 여기가 엄격해진 부분입니다!
+        // 진짜 관리자가 아니면, 정모장이든 누구든 가차 없이 검사합니다.
+        if (!isRealAdmin) {
+             if (!myTier) return alert("🚫 명단에 없는 유저입니다. (참석 체크 확인해주세요)");
+             
+             // 내 등급과 선택한 칩의 색깔이 다르면 즉시 차단!
+             if (tier !== myTier) {
+                 return alert(`⚖️ 규칙 준수!\n회원님은 오직 [${myTier.toUpperCase()}] 칩만 선택할 수 있습니다.`);
+             }
         }
 
+        // --- 여기서부터는 칩 가져가는 로직 (기존과 동일) ---
         let alreadyPicked = false;
         ['red', 'blue', 'green', 'yellow', 'purple'].forEach(t => {
             if(data[t]) {
@@ -2081,20 +2119,21 @@ window.pickChip = function(tier, id) {
             }
         });
 
-        if(alreadyPicked) return alert("🚫 이미 칩을 뽑으셨습니다!");
+        if(alreadyPicked) return alert("🚫 욕심쟁이! 이미 칩을 하나 선택하셨습니다.");
 
         const chipRef = db.ref(`bowling_v14/casino/${tier}/${id}`);
         chipRef.transaction(current => {
             if(current && current.status === 'idle') {
                 return { ...current, status: 'picked', owner: myName };
             }
-            return;
+            return; 
         }, (err, committed) => {
-            if(!committed) alert("⚠️ 이미 다른 분이 선택했거나 오류가 발생했습니다.");
+            if(!committed) alert("⚠️ 이런! 다른 분이 먼저 채갔습니다. 다른 칩을 노려보세요!");
         });
     }); 
 }; 
 
+// 기존 window.finishCasino 함수를 찾아서 이걸로 통째로 바꾸세요!
 window.finishCasino = function() {
     const myName = (loggedInUser || "").trim();
     const isBoss = isAdmin || (managers.jungmo === myName) || (managers.lightning === myName);
@@ -2104,17 +2143,15 @@ window.finishCasino = function() {
 
     db.ref('bowling_v14/casino').once('value', sn => {
         const data = sn.val() || {};
-        if (!data) return;
+        
+        // ... (중간 생략: 칩 계산 로직은 그대로 둠) ...
+        // 편의상 이 부분은 기존 로직을 그대로 사용하므로, 
+        // ★★★ 아래의 db.ref 저장 부분만 확실하게 확인해주세요! ★★★
 
         let pickedOwners = [];
         ['red', 'blue', 'green', 'yellow', 'purple'].forEach(t => {
-            if(data[t]) {
-                Object.values(data[t]).forEach(c => {
-                    if(c.status === 'picked') pickedOwners.push(c.owner);
-                });
-            }
+            if(data[t]) Object.values(data[t]).forEach(c => { if(c.status==='picked') pickedOwners.push(c.owner); });
         });
-
         let unpickedPeople = attendees.filter(name => !pickedOwners.includes(name));
         let finalTeamsMap = {}; 
         
@@ -2123,25 +2160,17 @@ window.finishCasino = function() {
             Object.values(data[tier]).forEach(c => {
                 const teamNum = parseInt(laneSettings['team_' + c.lane]);
                 if(!teamNum) return;
+                if(!finalTeamsMap[teamNum]) finalTeamsMap[teamNum] = { teamNo: teamNum, members: [], totalAvg: 0, matchHandy: 0 };
                 
-                if(!finalTeamsMap[teamNum]) {
-                    finalTeamsMap[teamNum] = { teamNo: teamNum, members: [], totalAvg: 0, matchHandy: 0 };
-                }
-
                 let isPicked = (c.status === 'picked');
                 let memberName = isPicked ? c.owner : (unpickedPeople.length > 0 ? unpickedPeople.shift() : "👻고스트");
-                
                 let stats = window.getWeightedStats(memberName);
                 let mInfo = members.find(x => x.name === memberName.trim()) || { handicap: 0 };
                 let weightedAvg = memberName.includes("고스트") ? 0 : stats.weightedAvg;
 
                 finalTeamsMap[teamNum].members.push({
-                    name: memberName,
-                    lane: c.lane,
-                    avg: weightedAvg,
-                    handy: parseInt(mInfo.handicap) || 0,
-                    score: 0,
-                    isGhost: memberName.includes("고스트")
+                    name: memberName, lane: c.lane, avg: weightedAvg,
+                    handy: parseInt(mInfo.handicap) || 0, score: 0, isGhost: memberName.includes("고스트")
                 });
                 finalTeamsMap[teamNum].totalAvg += weightedAvg;
             });
@@ -2149,30 +2178,19 @@ window.finishCasino = function() {
 
         const teamArr = Object.values(finalTeamsMap).sort((a,b) => a.teamNo - b.teamNo);
         const maxAvg = Math.max(...teamArr.map(t => t.totalAvg)); 
-        teamArr.forEach(t => {
-            t.matchHandy = (t.totalAvg < maxAvg) ? Math.round(maxAvg - t.totalAvg) : 0;
-        });
-              
+        teamArr.forEach(t => t.matchHandy = (t.totalAvg < maxAvg) ? Math.round(maxAvg - t.totalAvg) : 0);
+            
+        // ✅ [핵심 수정] 배정된 게임 번호(currentTargetGame)로 화면을 강제 이동시킵니다!
         db.ref(`bowling_v14/gameTeams/${currentTargetGame}`).set(teamArr).then(() => {
             db.ref('bowling_v14/settings').update({
-                currentTab: 'progressPanel',
-                currentRankView: currentTargetGame,
-                currentInputGame: currentTargetGame
+                currentTab: 'progressPanel',      // 진행 화면으로 이동
+                currentRankView: currentTargetGame, // ★ 보여줄 게임도 현재 게임으로!
+                currentInputGame: currentTargetGame // ★ 입력할 게임도 현재 게임으로!
             });
             alert(`✅ ${currentTargetGame}G 배정 완료!`);
             db.ref('bowling_v14/casino').set(null);
         });
     }); 
-}; 
-
-window.nextCnt = function(lane, current) {
-    let next = 0;
-    if (current === 0) next = 2;
-    else if (current === 2) next = 3;
-    else if (current === 3) next = 4;
-    else next = 0;
-    
-    window.updateConfig('cnt_' + lane, next);
 };
 
 window.nextTeam = function(lane, current) {
