@@ -2724,41 +2724,7 @@ window.jumpToSpecificEvent = function() {
     console.log("초기화 체크 중");
   }
 
-  // 2. 카카오톡 공유 기능 (깔끔하게 하나로 합침)
-  function shareMessage() {
-    try {
-      if (typeof Kakao === 'undefined') {
-        alert("카카오 프로그램을 찾을 수 없습니다. 페이지를 새로고침해 보세요.");
-        return;
-      }
-      
-      if (!Kakao.isInitialized()) {
-        Kakao.init('fa7a8ba02d5835b0aa4183eac217cb7a');
-      }
-
-      Kakao.Share.sendDefault({
-        objectType: 'feed',
-        content: {
-          title: '일산 에이스 볼링 클럽',
-          description: '🎳 정기모임 & 번개모임 신청하세요!',
-          imageUrl: 'https://beumjookim.github.io/ilsanacebc/ace.png',
-          link: {
-            mobileWebUrl: window.location.href,
-            webUrl: window.location.href,
-          },
-        },
-        buttons: [{
-          title: '참석 버튼 누르기',
-          link: {
-            mobileWebUrl: window.location.href,
-            webUrl: window.location.href,
-          },
-        }],
-      });
-    } catch (e) {
-      alert("카톡 실행 실패: " + e.message);
-    }
-  }
+  
 // ==========================================
 // 📢 [추가] 관리자 공지 발송 기능
 // ==========================================
