@@ -1478,81 +1478,127 @@ window.getWeightedStats = function(name) {
 window.runAssignment = function() {
     if(selectedBlocks.length === 0 || attendees.length === 0) return alert("구역과 참석자를 확인하세요.");
 
-    const teamCount = selectedBlocks.length * 2;
-    const totalPeople = attendees.length;
-    
-    // 팀별 기본 배정 인원 계산 (예: 16명/4팀 = 4명)
-    const baseSize = Math.floor(totalPeople / teamCount);
-    const remainder = totalPeople % teamCount;
+    // 1. [정렬] 오늘 참석자 20명을 실력순으로 줄 세우기
+    const rankingList = attendees
+        .filter(n => !n.includes("고스트"))
+        .map(name => {
+            const stats = window.getWeightedStats(name);
+            return { name: name.trim(), avg: stats.weightedAvg, isGhost: false };
+        })
+        .sort((a, b) => b.avg - a.avg);
 
-    let women = [], men = [];
-    attendees.forEach(n => {
-        const s = window.getWeightedStats(n);
-        const m = members.find(x => x.name === n) || {gender:'남', handicap:0};
-        const p = { name: n, avg: s.weightedAvg, gender: m.gender, isGhost: false, handicap: m.handicap || 0, score: 0 };
-        if(p.gender === '여') women.push(p); else men.push(p);
-    });
-
-    let finalTeams = [];
-    for(let i=0; i<teamCount; i++) {
-        // 실제 사람이 들어갈 자리 수 (remainder가 있으면 일부 팀은 +1명)
-        let cap = baseSize + (i < remainder ? 1 : 0);
-        finalTeams.push({ teamNo: i + 1, humanCap: cap, capacity: 5, members: [], totalAvg: 0 });
+    // 20명이 안 될 경우 고스트로 채우기
+    while(rankingList.length < 20) {
+        rankingList.push({ name: "👻고스트", avg: 0, isGhost: true });
     }
 
-    // 1. 여성 실력순 균등 분배
-    women.sort((a,b)=>b.avg-a.avg).forEach((p, i) => { 
-        finalTeams[i % teamCount].members.push(p); 
-        finalTeams[i % teamCount].totalAvg += p.avg; 
-    });
-    
-    // 2. 남성 실력순 밸런스 분배
-    men.sort((a,b)=>b.avg-a.avg).forEach(p => {
-        let targets = finalTeams.filter(t => t.members.length < t.humanCap);
-        targets.sort((a,b) => a.totalAvg - b.totalAvg);
-        if(targets.length > 0) { 
-            targets[0].members.push(p); 
-            targets[0].totalAvg += p.avg; 
-        }
-    });
+    // 2. [그룹 분리] 상위자(1-4), 차상위(5-8), 나머지(9-20)
+    let top4 = rankingList.slice(0, 4).sort(() => Math.random() - 0.5); // 좌측 기둥 (랜덤 순환)
+    let next4 = rankingList.slice(4, 8).sort(() => Math.random() - 0.5); // 우측 기둥 (랜덤 순환)
+    let others = rankingList.slice(8, 20); // 나머지 12명
 
-    // 3. [핵심 수정] 인원이 부족할 때만 고스트 투입 (기존 capacity 대신 humanCap 기준)
-    finalTeams.forEach(t => { 
-        // humanCap까지는 이미 사람이 찼으므로, 이 루프는 인원이 딱 맞으면 실행되지 않습니다.
-        while(t.members.length < t.humanCap) {
-            t.members.push({ name: "👻고스트", avg: 0, gender: "남", isGhost: true, handicap: 0, score: 0 });
-        }
-    });
+    // 3. [팀 및 레인 설정]
+    let teamCount = 4; // 20명 기준 4개 팀 고정
+    let finalTeams = [];
+    for(let i=0; i<teamCount; i++) {
+        finalTeams.push({ teamNo: i + 1, members: [], totalAvg: 0, matchHandy: 0 });
+    }
 
-    // 4. 레인 배치 및 매치핸디 계산
+    // 레인 쌍 (3,4 / 5,6 / 7,8 / 9,10)
     let lanePairs = [];
-    selectedBlocks.sort((a,b)=>a-b).forEach(z => { lanePairs.push([(z-1)*4+3, (z-1)*4+4], [(z-1)*4+5, (z-1)*4+6]); });
-    const maxAvg = Math.max(...finalTeams.map(t => t.totalAvg));
-
-    finalTeams.sort((a,b) => a.teamNo - b.teamNo).forEach((t, i) => {
-        const pair = lanePairs[i] || [0,0];
-        t.members.sort((a,b) => b.avg - a.avg);
-        // 지그재그 배치 (1,3,5위 좌측 / 2,4위 우측)
-        t.members.forEach((m, idx) => { m.lane = (idx % 2 === 0) ? pair[0] : pair[1]; });
-        t.matchHandy = Math.max(0, Math.round(maxAvg - t.totalAvg));
+    selectedBlocks.sort((a,b)=>a-b).forEach(z => { 
+        lanePairs.push([(z-1)*4+3, (z-1)*4+4], [(z-1)*4+5, (z-1)*4+6]); 
     });
 
-    // 5. 저장 및 화면 전환
-    gameTeams[currentTargetGame] = finalTeams; // finalTeams 변수는 위에서 계산된 결과
-    
+    // 4. [기둥 박기] 상위 4명 좌측(홀수레인), 차상위 4명 우측(짝수레인)
+    finalTeams.forEach((team, i) => {
+        const pair = lanePairs[i] || [0, 0];
+        
+        // 좌측 기둥 배정 (1~4위 중 하나)
+        let L_Leader = top4[i];
+        L_Leader.lane = pair[0];
+        team.members.push(L_Leader);
+        team.totalAvg += L_Leader.avg;
+
+        // 우측 기둥 배정 (5~8위 중 하나)
+        let R_Leader = next4[i];
+        R_Leader.lane = pair[1];
+        team.members.push(R_Leader);
+        team.totalAvg += R_Leader.avg;
+    });
+
+    // 5. [나머지 배정] 최근 2~3회 중복 방지 셔플
+    // 과거 기록(regular_history) 가져오기
+    const history = Object.values(window.regularHistoryCache || {}).sort((a,b)=>b.date.localeCompare(a.date)).slice(0, 3);
+
+    // 나머지 12명 섞기 (중복 방지 로직 적용)
+    const shuffleOthers = (players, teams) => {
+        players.sort(() => Math.random() - 0.5); // 기본 랜덤 셔플
+        
+        players.forEach(player => {
+            if(player.isGhost) {
+                // 고스트는 그냥 자리 비는 팀에 투입
+                let t = teams.find(t => t.members.length < 5);
+                t.members.push(player);
+                return;
+            }
+
+            // 실존 회원은 중복 검사
+            let bestTeam = null;
+            let minOverlap = 999;
+
+            teams.filter(t => t.members.length < 5).forEach(team => {
+                let overlapCount = 0;
+                history.forEach(past => {
+                    const pastTeam = (past.gameTeams[1] || []).find(pt => pt.members.some(m => m.name === player.name));
+                    if(pastTeam) {
+                        const pastMemberNames = pastTeam.members.map(m => m.name);
+                        team.members.forEach(m => {
+                            if(pastMemberNames.includes(m.name)) overlapCount++;
+                        });
+                    }
+                });
+
+                if(overlapCount < minOverlap) {
+                    minOverlap = overlapCount;
+                    bestTeam = team;
+                }
+            });
+            
+            bestTeam.members.push(player);
+            bestTeam.totalAvg += player.avg;
+        });
+    };
+
+    shuffleOthers(others, finalTeams);
+
+    // 6. [레인 최종 배분] 각 팀 내에서 3:2 혹은 2:3 비율로 좌우 레인 확정
+    finalTeams.forEach((t, i) => {
+        const pair = lanePairs[i];
+        // 대장 2명을 제외한 나머지 3명을 좌/우에 적절히 배분
+        let leftCount = 1; // 이미 대장 1명 있음
+        t.members.forEach((m, idx) => {
+            if(idx > 1) { // 3번째 멤버부터
+                if(leftCount < 3) { m.lane = pair[0]; leftCount++; }
+                else { m.lane = pair[1]; }
+            }
+        });
+    });
+
+    // 7. [마무리] 저장 및 화면 전환
+    const maxAvg = Math.max(...finalTeams.map(t => t.totalAvg));
+    finalTeams.forEach(t => t.matchHandy = Math.max(0, Math.round(maxAvg - t.totalAvg)));
+
+    gameTeams[currentTargetGame] = finalTeams;
     db.ref('bowling_v14/gameTeams').set(gameTeams).then(() => {
-        alert(`✅ ${currentTargetGame}G 배정 완료!`);
-        
-        // ✅ [핵심 수정] 여기서도 currentRankView를 확실하게 업데이트!
-        currentRankView = currentTargetGame; 
-        
+        alert(`✅ [관리자 원칙] ${currentTargetGame}G 배정 완료!\n(상위자 분산 및 중복 방지 적용)`);
+        currentRankView = currentTargetGame;
         db.ref('bowling_v14/settings').update({
             currentTab: 'progressPanel',
-            currentRankView: currentTargetGame, // ★ 진행 화면을 이 게임으로 고정!
+            currentRankView: currentTargetGame,
             currentInputGame: currentTargetGame
         });
-        
-        window.showPanel('progressPanel', document.querySelectorAll('.tab-btn')[3]); 
+        window.showPanel('progressPanel', document.querySelectorAll('.tab-btn')[3]);
     });
 };
 
