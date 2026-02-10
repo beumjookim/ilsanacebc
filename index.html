@@ -2041,8 +2041,9 @@ window.initCasino = function() {
     if(!attendees || attendees.length === 0) return alert("참석자를 먼저 체크해주세요.");
 
     let teamPools = {}; 
-    let totalSeatCount = 0;
+    let maxTeamSize = 0; // 팀당 최대 인원수 확인용
 
+    // 1. 설정된 레인 정보를 바탕으로 팀별 자리를 모읍니다.
     selectedBlocks.forEach(z => {
         const start = (z - 1) * 4 + 3;
         for(let l = start; l < start + 4; l++) {
@@ -2053,8 +2054,8 @@ window.initCasino = function() {
                 if(!teamPools[teamNum]) teamPools[teamNum] = [];
                 for(let i = 0; i < count; i++) {
                     teamPools[teamNum].push(l); 
-                    totalSeatCount++;
                 }
+                if(teamPools[teamNum].length > maxTeamSize) maxTeamSize = teamPools[teamNum].length;
             }
         }
     });
@@ -2062,15 +2063,22 @@ window.initCasino = function() {
     const uniqueTeamNos = Object.keys(teamPools).sort((a,b) => a-b);
     const T = uniqueTeamNos.length; 
 
-    if(T === 0) return alert("🚩 조편성 하단에 '팀 번호'를 입력해야 합니다! (예: 1, 2)");
+    if(T === 0) return alert("🚩 조편성 하단에 '팀 번호'를 입력해야 합니다!");
 
-    let casinoState = { settings: { status: 'open', totalSlots: totalSeatCount }, red: {}, blue: {}, green: {}, yellow: {} };
-    const tiers = ['red', 'blue', 'green', 'yellow'];
+    // 2. 카지노 상태 초기화 (Yellow 이후 등급도 수용 가능하도록 설계)
+    let casinoState = { 
+        settings: { status: 'open', totalSlots: attendees.length }, 
+        red: {}, blue: {}, green: {}, yellow: {} 
+    };
 
+    // 각 팀의 레인들을 랜덤하게 섞습니다.
     uniqueTeamNos.forEach(tNo => teamPools[tNo].sort(() => Math.random() - 0.5));
 
-    for(let round = 0; round < 4; round++) {
-        const currentTier = tiers[round];
+    // 3. [핵심] 팀당 최대 인원수(예: 5명)만큼 반복하며 칩을 생성합니다.
+    const tiers = ['red', 'blue', 'green', 'yellow', 'yellow']; // 4, 5번째는 모두 노란색
+
+    for(let round = 0; round < maxTeamSize; round++) {
+        const currentTier = tiers[round] || 'yellow'; // 5번째 이후도 노란색 처리
         let tierLanes = []; 
 
         uniqueTeamNos.forEach((tNo) => {
@@ -2079,10 +2087,13 @@ window.initCasino = function() {
             }
         });
 
+        // 같은 등급 내에서도 레인이 섞이도록 랜덤 셔플
         tierLanes.sort(() => Math.random() - 0.5);
 
         tierLanes.forEach((laneNum, idx) => {
-            casinoState[currentTier][idx + 1] = {
+            // 기존 칩 개수를 확인하여 다음 ID 부여
+            const nextId = Object.keys(casinoState[currentTier]).length + 1;
+            casinoState[currentTier][nextId] = {
                 status: 'idle',
                 owner: '',
                 lane: laneNum
@@ -2090,8 +2101,9 @@ window.initCasino = function() {
         });
     }
 
+    // 4. DB 저장
     db.ref('bowling_v14/casino').set(casinoState).then(() => {
-        alert(`🎰 등급별 칩 생성 완료! (총 ${T}개 팀 기준)`);
+        alert(`🎰 칩 생성 완료!\n- 참여인원: ${attendees.length}명\n- 5인조 대응 칩 세팅이 완료되었습니다.`);
     });
 };
 window.renderCasino = function() {
@@ -2135,27 +2147,27 @@ window.renderCasino = function() {
    - 오직 '찐 관리자'만 아무거나 선택 가능
 */
 window.pickChip = function(tier, id) {
+    // 1. 내 정보 가져오기
     const myTier = window.getMyTier(); 
     const myName = (loggedInUser || "").trim();
     
-    // ✅ 수정 포인트: '관리자(ace_admin)'만 특권 유지 (정모장/번개장 제외)
+    // 2. [검문소] 서버(DB) 문을 두드리기 전에 자격부터 검사합니다! (위치 변경됨)
     const isRealAdmin = (localStorage.getItem('ace_admin') === 'true');
 
+    if (!isRealAdmin) { // 찐 관리자가 아니면 무조건 검사
+        if (!myTier) return alert("🚫 명단에 없는 유저입니다. (참석 체크 확인해주세요)");
+        
+        // 내 등급과 선택한 칩의 색깔이 다르면 즉시 차단! (서버 조회 X)
+        if (tier !== myTier) {
+            return alert(`⚖️ 규칙 준수!\n회원님은 오직 [${myTier.toUpperCase()}] 칩만 선택할 수 있습니다.`);
+        }
+    }
+
+    // 3. 자격 검사가 통과된 사람만 실제 DB를 열어봅니다.
     db.ref('bowling_v14/casino').once('value', sn => {
         const data = sn.val() || {};
         
-        // ⛔ 여기가 엄격해진 부분입니다!
-        // 진짜 관리자가 아니면, 정모장이든 누구든 가차 없이 검사합니다.
-        if (!isRealAdmin) {
-             if (!myTier) return alert("🚫 명단에 없는 유저입니다. (참석 체크 확인해주세요)");
-             
-             // 내 등급과 선택한 칩의 색깔이 다르면 즉시 차단!
-             if (tier !== myTier) {
-                 return alert(`⚖️ 규칙 준수!\n회원님은 오직 [${myTier.toUpperCase()}] 칩만 선택할 수 있습니다.`);
-             }
-        }
-
-        // --- 여기서부터는 칩 가져가는 로직 (기존과 동일) ---
+        // --- 여기서부터는 칩 가져가는 로직 ---
         let alreadyPicked = false;
         ['red', 'blue', 'green', 'yellow', 'purple'].forEach(t => {
             if(data[t]) {
