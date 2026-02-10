@@ -18,23 +18,34 @@
 <meta property="og:url" content="https://beumjookim.github.io/ilsanacebc/">
 
     <style>
-        /* 기본 설정 */
-        :root { --primary: #2c3e50; --accent: #3498db; --danger: #e74c3c; --warning: #f39c12; --bg: #f8f9fa; --green: #27ae60; --dark: #34495e; --purple: #8e44ad; }
-        /* 1. 겉틀 고정 (키보드가 올라와도 전체 화면이 밀리지 않음) */
-html, body {
-    height: 100%;
-    margin: 0;
-    padding: 0;
-    overflow: auto;
-    position: relative;
-    width: 100%;
-    
-    /* ★ 여기부터 추가된 코드입니다 ★ */
-    -webkit-text-size-adjust: 100%; /* 아이폰 글자 뻥튀기 금지 */
-    -moz-text-size-adjust: 100%;    /* 파이어폭스 금지 */
-    text-size-adjust: 100%;         /* 표준 금지 */
-    font-size: 14px;                /* 기본 글자 크기 고정 */
-}
+    :root { 
+        --primary: #2c3e50; --accent: #3498db; --danger: #e74c3c; 
+        --warning: #f39c12; --bg: #f8f9fa; --green: #27ae60; 
+        --dark: #34495e; --purple: #8e44ad; 
+    }
+
+    /* 1. 전체 틀 설정 (스크롤 가능 + 헤더 여백) */
+    html, body {
+        height: 100%;
+        margin: 0;
+        
+        /* ✅ 중요: 패딩을 아래처럼 설정해야 합니다! */
+        padding: 0; 
+        padding-top: 60px; /* 위쪽만 60px 띄우기 (이게 나중에 와야 함) */
+        
+        /* ✅ 스크롤 및 레이아웃 설정 */
+        overflow-y: auto; 
+        position: relative;
+        width: 100%;
+        background-color: var(--bg);
+        font-family: 'Noto Sans KR', sans-serif;
+
+        /* ✅ 모바일 최적화 (관리자님이 추가하신 신의 한 수!) */
+        -webkit-text-size-adjust: 100%; 
+        -moz-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+        font-size: 14px;
+    }
         
         input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
         input[type="number"] { -moz-appearance: textfield; }
@@ -269,7 +280,21 @@ html, body {
     </div>
 
     <div class="container" id="mainContainer" style="display:none;">
-        <div class="header" style="padding: 10px 15px; display: flex; justify-content: space-between; align-items: center;">
+        <<div class="header" style="
+    position: fixed;    /* 1. 화면에 고정! */
+    top: 0;             /* 2. 맨 위에 밀착! */
+    left: 0;            /* 3. 왼쪽 벽에 밀착! */
+    width: 100%;        /* 4. 가로로 꽉 채우기! */
+    z-index: 1000;      /* 5. 다른 내용물보다 무조건 위로! */
+    background: #ffffff; /* 6. 배경색 (안 주면 뒤에 글씨가 겹쳐 보여요!) */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1); /* 7. (선택) 살짝 그림자를 주면 더 예뻐요 */
+    
+    padding: 10px 15px; 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    box-sizing: border-box; /* 8. 패딩 때문에 가로가 넓어지는 걸 방지! */
+">
     
     <div style="display: flex; align-items: center; gap: 12px;">
         <h2 style="margin: 0; font-size: 0.9rem; white-space: nowrap; color: #333;">Ace V18.0</h2>
@@ -391,7 +416,7 @@ html, body {
     <ul id="bangaeMemberList" style="list-style:none; padding:0; margin:0;">
         </ul>
 </div>
-
+</div>
             <div id="casinoPanel" class="panel">
                 <div class="casino-table">
                     <h2 style="color: #f1c40f; margin-top:0; text-shadow: 2px 2px 4px #000;">🎰 ACE CASINO TABLE</h2>
