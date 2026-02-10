@@ -31,7 +31,7 @@
         
         /* ✅ 중요: 패딩을 아래처럼 설정해야 합니다! */
         padding: 0; 
-        padding-top: 60px; /* 위쪽만 60px 띄우기 (이게 나중에 와야 함) */
+        padding-top: 115px; /* 위쪽만 60px 띄우기 (이게 나중에 와야 함) */
         
         /* ✅ 스크롤 및 레이아웃 설정 */
         overflow-y: auto; 
@@ -74,22 +74,26 @@
 }
         
         /* style 태그 안의 .tab-menu 부분을 이렇게 고쳐보세요 */
+/* 📌 탭 메뉴를 헤더 바로 밑에 강제로 고정시키는 코드 */
 .tab-menu {
     display: flex;
     gap: 5px;
-    padding: 10px 25px;
+    padding: 10px 15px; /* 양옆 여백 적당히 */
     background: #fff;
     border-bottom: 1px solid #ddd;
     
-    /* 📌 핵심: 끈적하게 달라붙어라! */
-    position: sticky; 
+    /* ✅ 핵심 수정: sticky 대신 fixed를 씁니다! */
+    position: fixed; 
     
-    /* ⚠️ 중요: 헤더(약 58~60px) 바로 밑에 붙어야 하므로 그만큼 띄워줍니다 */
+    /* 헤더 높이가 약 55~60px 정도 됩니다. 그 바로 아래에 위치시킵니다. */
     top: 58px; 
     
-    z-index: 1900;
-    overflow-x: auto;
+    left: 0;
+    width: 100%; /* 가로 꽉 채우기 */
+    z-index: 1900; /* 헤더보다는 아래, 본문보다는 위에 */
+    overflow-x: auto; /* 메뉴가 많으면 옆으로 스크롤 */
     white-space: nowrap;
+    box-sizing: border-box; /* 패딩 포함해서 너비 계산 */
 }
 
         .tab-btn { flex: 1; padding: 12px 0; border: 1px solid #eee; background: #f8f9fa; border-radius: 8px; font-weight: bold; cursor: pointer; min-width: 60px; text-align: center; color: #555; }
