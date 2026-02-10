@@ -25,8 +25,8 @@ html, body {
     height: 100%;
     margin: 0;
     padding: 0;
-    overflow: hidden;
-    position: fixed;
+    overflow: auto;
+    position: relative;
     width: 100%;
     
     /* ★ 여기부터 추가된 코드입니다 ★ */
@@ -380,14 +380,16 @@ html, body {
         설정 인원 합계: <span id="totalConfigCount" style="color:var(--danger); font-size:1.1rem;">0</span>명
     </div>
 
-    <div id="lightningManagerSelect" class="input-box" style="display:none; border:2px solid #f39c12; background:#fffcf5; margin-top:20px;">
-        <h3 style="color:#d35400; margin-top:0;">⚡ 번개장 선출</h3>
-        <div style="display:flex; gap:5px;">
-            <select id="bungaeJangSelect" class="big-select" style="margin-bottom:0;"></select>
-            <button class="btn-sm" style="background:#f39c12; color:white; width:80px;" onclick="window.setBungaeManager()">임명</button>
-        </div>
-        <div style="margin-top:10px; font-weight:bold;">현재 번개장: <span id="currentBungaeJang" style="color:#d35400;">없음</span></div>
+    <div style="background:#fff; padding:15px; border-radius:10px; border:1px solid #ddd; margin-top:10px;">
+    <h4 style="margin-top:0;">⚡ 참석자 등록 & 번개장(👑) 선택</h4>
+    
+    <div style="display:flex; gap:5px; margin-bottom:10px;">
+        <input type="text" id="inputName" placeholder="이름 입력" style="flex:1; padding:8px;">
+        <button onclick="addBangaeMember()" style="background:#FFEB33; border:none; padding:8px 15px; font-weight:bold; cursor:pointer;">등록</button>
     </div>
+
+    <ul id="bangaeMemberList" style="list-style:none; padding:0; margin:0;">
+        </ul>
 </div>
 
             <div id="casinoPanel" class="panel">
@@ -1013,16 +1015,6 @@ window.activateSelectedEvent = function() {
     };
 
     
-
-    window.setJungmoManager = function() {
-        const name = document.getElementById('jungmoJangInput').value.trim();
-        if(db) db.ref('bowling_v14/managers/jungmo').set(name).then(()=>alert("정모장 설정 완료"));
-    };
-    window.setBungaeManager = function() {
-        const name = document.getElementById('bungaeJangSelect').value;
-        if(!name) return alert("회원을 선택해주세요.");
-        if(db) db.ref('bowling_v14/managers/lightning').set(name).then(()=>alert("번개장 설정 완료"));
-    };
 
     window.renderAssignGameTabs = function() {
     const area = document.getElementById('assignGameTabs');
@@ -2775,6 +2767,33 @@ function sendNotice() {
     } catch (e) {
         alert("카톡 전송 실패: " + e.message);
     }
+}
+// ⚡ 이 코드가 있어야 '등록' 버튼이 작동합니다!
+function addBangaeMember() {
+    var nameInput = document.getElementById('inputName');
+    var name = nameInput.value.trim();
+
+    if (!name) {
+        alert("이름을 입력해주세요!");
+        return;
+    }
+
+    var list = document.getElementById('bangaeMemberList');
+    var li = document.createElement('li');
+    li.style = "padding: 8px 0; border-bottom: 1px solid #eee; display: flex; align-items: center;";
+
+    // ✅ 이름 옆에 번개장 선택 버튼(radio)과 삭제 버튼(❌)을 함께 만듭니다.
+    li.innerHTML = `
+        <label style="flex:1; display:flex; align-items:center; cursor:pointer;">
+            <input type="radio" name="leader" value="${name}" style="margin-right:10px;">
+            <span>${name}</span>
+        </label>
+        <button onclick="this.parentElement.remove()" style="background:none; border:none; color:#ff4d4d; cursor:pointer;">❌</button>
+    `;
+
+    list.appendChild(li);
+    nameInput.value = ''; // 입력창 초기화
+    nameInput.focus();
 }
 </script> 
 <div id="admin-notice-panel" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width: 90%; max-width: 400px; background:#ffffff; z-index:10000; border:3px solid #FFEB33; padding:20px; border-radius:15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
