@@ -251,8 +251,11 @@ html, body {
         <button class="enter-btn" onclick="window.showGlobalLogin()">앱 시작하기</button>
     </div>
 <div id="admin-menu" style="display: none; background: #f0f0f0; padding: 10px; text-align: center; border-bottom: 1px solid #ccc;">
-        <button onclick="sendKakao()" style="background: #fee500; border: none; padding: 5px 10px; border-radius: 5px;">카톡 전송</button>
-        <button onclick="toggleNoticePanel()" style="background: #007bff; color: white; border: none; padding: 5px 10px; border-radius: 5px;">공지 작성</button>
+        <button onclick="toggleNoticePanel()" style="background:none; border:none; cursor:pointer;">
+    <span style="font-size:2rem;">📢</span> 
+    <br>
+    <span style="font-size:0.8rem; font-weight:bold;">공지 발송</span>
+</button>
     </div>
 
     <div id="main-content">
