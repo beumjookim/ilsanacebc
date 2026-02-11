@@ -2595,12 +2595,13 @@ if (db) {
 
 // 3. 입력창 그리기 함수 업그레이드 (포커스 감지 기능 추가)
 window.renderInputs = function() {
-    // 입력 중 화면 갱신 방지
+    // 1. 입력 중일 때는 화면을 새로 그리지 않음 (자판 유지)
     if (window.isScoreEditing) return;
 
     const tabs = document.getElementById('inputTabs');
     let tHtml = '';
-    for(let i=1; i<=settings.gameCount; i++) {
+    const count = settings.gameCount || 4;
+    for(let i=1; i<=count; i++) {
         tHtml += `<div class="rank-tab ${currentInputGame===i?'active':''}" onclick="currentInputGame=${i};window.renderInputs()">${i}G</div>`;
     }
     tabs.innerHTML = tHtml;
@@ -2608,28 +2609,36 @@ window.renderInputs = function() {
     const area = document.getElementById('inputGridArea');
     let gData = gameTeams[currentInputGame] || [];
     
-    // 팀 필터링
+    // 팀 필터링 (특정 팀만 보기 선택 시)
     if(currentInputTeam) gData = gData.filter(t => t.teamNo == currentInputTeam);
 
     if (!gData || gData.length === 0) {
-        area.innerHTML = '<div style="padding:40px; text-align:center; color:#999;">⚠️ 데이터가 없습니다.</div>';
+        area.innerHTML = '<div style="padding:40px; text-align:center; color:#999;">⚠️ 배정된 데이터가 없습니다.</div>';
         return;
     }
 
     let h = '';
     gData.forEach(t => {
-        h += `<div class="input-team-box"><div class="input-team-header">Team ${t.teamNo}</div>`;
+        h += `<div class="input-team-box">
+                <div class="input-team-header">Team ${t.teamNo}</div>`;
+        
         t.members.forEach(m => {
             const isG = m.name.includes("고스트") || m.isGhost;
             
-            // window.renderInputs 함수 내부의 input 태그 부분
-h += `<input type="number" inputmode="numeric" pattern="[0-9]*" class="score-input"
-       value="${m.score||0}" 
-       ${isG ? 'readonly style="background:#f1f3f5; color:#777;"' : ''}
-       onfocus="window.isScoreEditing=true; if(this.value=='0') this.value='';" 
-       onblur="window.isScoreEditing=false;" 
-       oninput="if(this.value.length > 3) this.value = this.value.slice(0, 3); window.updateScore('${m.name}', this.value)"
-       style="width:80px; height:45px; font-size:1.5rem; text-align:center;">`;
+            h += `
+            <div class="score-row" style="display:flex; justify-content:space-between; align-items:center; padding:10px 15px; border-bottom:1px solid #eee;">
+                <span class="score-name" style="flex:1; font-size:1.1rem; font-weight:bold; color:#333;">
+                    ${m.name}
+                </span>
+
+                <input type="number" inputmode="numeric" pattern="[0-9]*" class="score-input"
+                       value="${m.score||0}" 
+                       ${isG ? 'readonly style="background:#f1f3f5; color:#777;"' : ''}
+                       onfocus="window.isScoreEditing=true; if(this.value=='0') this.value='';" 
+                       onblur="window.isScoreEditing=false;" 
+                       oninput="if(this.value.length > 3) this.value = this.value.slice(0, 3); window.updateScore('${m.name}', this.value)"
+                       style="width:80px; height:45px; font-size:1.5rem; text-align:center; border:2px solid #ccc; border-radius:8px;">
+            </div>`;
         });
         h += `</div>`;
     });
