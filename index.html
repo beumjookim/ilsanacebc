@@ -26,26 +26,28 @@
 
     /* 1. 전체 틀 설정 (스크롤 가능 + 헤더 여백) */
     html, body {
-        height: 100%;
-        margin: 0;
-        
-        /* ✅ 중요: 패딩을 아래처럼 설정해야 합니다! */
-        padding: 0; 
-        padding-top: 57px; /* 위쪽만 60px 띄우기 (이게 나중에 와야 함) */
-        
-        /* ✅ 스크롤 및 레이아웃 설정 */
-        overflow-y: auto; 
-        position: relative;
-        width: 100%;
-        background-color: var(--bg);
-        font-family: 'Noto Sans KR', sans-serif;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    
+    /* 1. 바깥쪽 스크롤바를 아예 제거합니다 (핵심) */
+    overflow: auto; 
+    
+    /* 2. 패딩이 전체 높이(100%)에 포함되도록 설정 (5G처럼 삐져나오는 것 방지) */
+    box-sizing: border-box; 
+    padding-top: 57px; 
 
-        /* ✅ 모바일 최적화 (관리자님이 추가하신 신의 한 수!) */
-        -webkit-text-size-adjust: 100%; 
-        -moz-text-size-adjust: 100%;
-        text-size-adjust: 100%;
-        font-size: 14px;
-    }
+    position: relative;
+    width: 100%;
+    background-color: var(--bg);
+    font-family: 'Noto Sans KR', sans-serif;
+
+    /* 모바일 최적화 유지 */
+    -webkit-text-size-adjust: 100%; 
+    -moz-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    font-size: 14px;
+}
         
         input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
         input[type="number"] { -moz-appearance: textfield; }
@@ -53,12 +55,10 @@
         /* 2. 속알맹이 스크롤 (점수판만 부드럽게 오르내림) */
 /* style 태그 안의 .container 부분을 찾아서 이렇게 단순하게 바꾸세요 */
 .container {
-    /* height: 100%;  <-- 이 줄 지우기 (또는 주석 처리) */
-    /* overflow-y: auto; <-- 이 줄 지우기 (범인!) */
-    
     display: flex;
     flex-direction: column;
-    min-height: 100vh; /* 화면 꽉 채우기 */
+    height: 100%; /* ★ 화면 높이 100%로 고정 */
+    overflow: hidden; /* ★ 여기서도 스크롤 금지 */
 }
         .header {
     /* padding: 15px;  <-- 기존 거 지우고 아래로 변경 */
@@ -101,9 +101,13 @@
         
         /* 3. 입력창이 가려지지 않게 하단 여백 확보 */
 .content-area {
-    flex: 1;
-    overflow-y: auto;
-    padding-bottom: 300px;    /* 키보드 올라올 공간 미리 확보 */
+    flex: 1; /* 남은 공간 꽉 채우기 */
+    overflow-y: auto; /* ★ 오직 여기만 스크롤 허용! */
+    -webkit-overflow-scrolling: touch; /* 아이폰에서 부드럽게 스크롤 */
+    padding-bottom: 100px; /* 맨 아래 내용이 가려지지 않게 여유 공간 */
+    /* [추가] 부모로부터 높이를 확실히 물려받도록 설정 */
+    display: flex;
+    flex-direction: column;
 }
         .panel {
     display: none;
@@ -418,16 +422,15 @@
     </div>
 
     <div style="background:#fff; padding:15px; border-radius:10px; border:1px solid #ddd; margin-top:10px;">
-    <h4 style="margin-top:0;">⚡ 참석자 등록 & 번개장(👑) 선택</h4>
+    <h4 style="margin-top:0; color:#e67e22;">⚡ 번개장(👑) 선택</h4>
+    <p style="font-size:0.85rem; color:#888; margin-bottom:10px;">오늘 참석 신청한 명단입니다. 번개장을 선택해주세요.</p>
     
-    <div style="display:flex; gap:5px; margin-bottom:10px;">
-        <input type="text" id="inputName" placeholder="이름 입력" style="flex:1; padding:8px;">
-        <button onclick="addBangaeMember()" style="background:#FFEB33; border:none; padding:8px 15px; font-weight:bold; cursor:pointer;">등록</button>
+    <div id="bangaeMemberList" style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="text-align:center; padding:20px; color:#ccc;">참석자가 없습니다.</div>
     </div>
-
-    <ul id="bangaeMemberList" style="list-style:none; padding:0; margin:0;">
-        </ul>
 </div>
+    
+    
 </div>
             <div id="casinoPanel" class="panel">
                 <div class="casino-table">
@@ -681,6 +684,7 @@ document.addEventListener('keydown', function(e) {
         if (index > -1 && index < inputs.length - 1) {
             e.preventDefault(); 
             inputs[index + 1].focus(); 
+            if(inputs[index + 1].value) inputs[index + 1].select();
         }
     }
 });
@@ -781,7 +785,6 @@ window.updateUI = function() {
     
     if(bBox) {
         bBox.style.display = isL ? 'block' : 'none';
-        if(isL && typeof window.renderBungaeJangSelect === 'function') window.renderBungaeJangSelect();
     }
 
     const jSettingName = document.getElementById('currentJungmoJangSetting');
@@ -790,16 +793,21 @@ window.updateUI = function() {
     const bNameSpan = document.getElementById('currentBungaeJang');
     if (bNameSpan) bNameSpan.innerText = managers.lightning || '없음';
 
+    // ▼▼▼ 화면 그리기 함수들 모음 ▼▼▼
     if(typeof window.renderEventList === 'function') window.renderEventList();
     if(typeof window.renderAssignGameTabs === 'function') window.renderAssignGameTabs(); 
     if(typeof window.renderMembers === 'function') window.renderMembers();
     if(typeof window.renderCasino === 'function') window.renderCasino();
+    
+    // ★ [추가된 한 줄] 번개장 명단 그리기 (여기에 넣어야 확실하게 뜹니다!)
+    if(typeof window.renderBungaeJangSelect === 'function') window.renderBungaeJangSelect();
 
     if(document.getElementById('groupAssignMethod')) 
         document.getElementById('groupAssignMethod').value = settings.assignMethod || 'snake';
     if(document.getElementById('setAssignMethod')) 
         document.getElementById('setAssignMethod').value = settings.assignMethod || 'snake';
-const activePanel = document.querySelector('.panel.active');
+
+    const activePanel = document.querySelector('.panel.active');
     if(activePanel) {
         // 진행 화면이면 점수판 다시 그리기
         if(activePanel.id === 'progressPanel' && typeof window.renderGameProgress === 'function') {
@@ -813,9 +821,9 @@ const activePanel = document.querySelector('.panel.active');
         if(activePanel.id === 'statsPanel' && typeof window.renderAllStats === 'function') {
             window.renderAllStats();
         }
-    if(typeof window.jumpToSpecificEvent === 'function') window.jumpToSpecificEvent();
+        if(typeof window.jumpToSpecificEvent === 'function') window.jumpToSpecificEvent();
     }
-    };
+};
 window.createEvent = function() {
     const date = document.getElementById('eventDate').value;
     const exactTime = document.getElementById('eventExactTime').value; 
@@ -844,23 +852,62 @@ window.createEvent = function() {
         h = h % 12 || 12; // 0시는 12시로 표시
         return `${ampm} ${String(h).padStart(2, '0')}:${m}`;
     };
+// [번개장 선택] 참석자 명단이 쭉 뜨고, 클릭하면 바로 번개장으로 지정됩니다.
 window.renderBungaeJangSelect = function() {
-    const sel = document.getElementById('bungaeJangSelect');
-    if (!sel) return;
+    const listArea = document.getElementById('bangaeMemberList'); 
+    if (!listArea) return;
 
-    const list = attendees || [];
-    let html = '<option value="">-- 번개장 선택 --</option>';
+    // 1. [중요] 참석자 명단에서 고스트는 제외하고 진짜 사람만 가져옵니다.
+    const realAttendees = attendees.filter(n => n && !n.includes("고스트"));
 
-    if (list.length === 0) {
-        html = '<option value="">신청자가 없습니다</option>';
-    } else {
-        list.forEach(name => {
-            const isSelected = (managers.lightning === name) ? 'selected' : '';
-            html += `<option value="${name}" ${isSelected}>${name}</option>`;
-        });
+    if (realAttendees.length === 0) {
+        listArea.innerHTML = '<div style="color:#999; text-align:center; padding:20px; border:1px dashed #ddd;">참석 신청자가 없습니다.</div>';
+        return;
     }
 
-    sel.innerHTML = html;
+    const currentBoss = managers.lightning || "";
+
+    // 2. 이름들을 나열하여 선택 가능한 버튼으로 만듭니다.
+    let html = realAttendees.map(name => {
+        const isSelected = (name === currentBoss);
+        const style = isSelected 
+            ? "background:#fff9db; border:2px solid #fab005; color:#e67e22; font-weight:bold;" 
+            : "background:#f8f9fa; border:1px solid #eee; color:#333;";
+
+        return `
+            <div style="padding:12px 15px; border-radius:8px; cursor:pointer; display:flex; align-items:center; ${style}"
+                 onclick="window.setLightningBoss('${name}')">
+                <div style="width:18px; height:18px; border-radius:50%; border:2px solid ${isSelected?'#fab005':'#ccc'}; margin-right:10px; background:white; display:flex; align-items:center; justify-content:center;">
+                    ${isSelected ? '<div style="width:10px; height:10px; border-radius:50%; background:#fab005;"></div>' : ''}
+                </div>
+                <span style="flex:1; font-size:1.1rem;">${name}</span>
+                ${isSelected ? '<span>👑</span>' : ''}
+            </div>
+        `;
+    }).join('');
+
+    listArea.innerHTML = html;
+};
+
+// 번개장 클릭 시 저장 함수
+window.setLightningBoss = function(name) {
+    if(!confirm(`⚡ [${name}] 님을 오늘의 번개장으로 지정할까요?`)) return;
+    
+    db.ref('bowling_v14/managers/lightning').set(name).then(() => {
+        // 성공 시 즉시 UI 갱신
+        window.updateUI();
+    });
+};
+
+// [번개장 저장] 라디오 버튼을 누르면 즉시 DB에 저장
+window.setLightningBoss = function(name) {
+    if(!confirm(`⚡ [${name}] 님을 번개장으로 임명하시겠습니까?`)) return;
+
+    managers.lightning = name; // 로컬 반영
+    db.ref('bowling_v14/managers/lightning').set(name).then(() => {
+        alert(`👑 ${name} 님이 번개장으로 설정되었습니다!`);
+        window.updateUI(); // 화면 갱신 (색깔 바뀌게)
+    });
 };
     window.renderEventList = function() {
     const area = document.getElementById('eventListArea');
@@ -1012,26 +1059,43 @@ window.activateSelectedEvent = function() {
         }
     };
     window.showPanel = function(id, btn) {
-        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-        document.getElementById(id).classList.add('active');
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        if(btn) btn.classList.add('active');
+    // 1. 화면 전환 (탭 활성화)
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    
+    // 2. 버튼 색깔 변경
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    if(btn) btn.classList.add('active');
 
-        if(id !== 'inputPanel') currentInputTeam = null;
+    // 3. 다른 탭 갔다가 오면 입력 팀 선택 해제
+    if(id !== 'inputPanel') currentInputTeam = null;
 
-        if(id === 'attendPanel') window.renderAttendanceList();
-        if(id === 'progressPanel') window.renderGameProgress();
-        if(id === 'statsPanel') window.renderAllStats(); 
-        if(id === 'inputPanel') {
-            if(loggedInUser) {
-                document.getElementById('scoreSection').style.display = 'block';
-                window.renderInputs(); 
-            } else {
-                document.getElementById('scoreSection').style.display = 'none';
-            }
+    // 4. 각 탭별로 실행해야 할 기능들
+    if(id === 'attendPanel') window.renderAttendanceList();
+    if(id === 'progressPanel') window.renderGameProgress();
+    if(id === 'statsPanel') window.renderAllStats(); 
+    if(id === 'memberPanel') window.renderMembers();
+
+    // ★★★ [여기가 추가된 부분입니다!] 조편성 탭 기능 ★★★
+    if(id === 'groupPanel') {
+        // 게임 탭(1G, 2G...) 그리기
+        if(typeof window.renderAssignGameTabs === 'function') window.renderAssignGameTabs();
+        // 레인 설정창(인원수, 팀번호) 그리기
+        if(typeof window.renderCustomLaneConfig === 'function') window.renderCustomLaneConfig();
+        // [핵심] 번개장 선택용 참석자 명단 그리기!
+        if(typeof window.renderBungaeJangSelect === 'function') window.renderBungaeJangSelect();
+    }
+
+    // 5. 점수 입력 탭 처리
+    if(id === 'inputPanel') {
+        if(loggedInUser) {
+            document.getElementById('scoreSection').style.display = 'block';
+            window.renderInputs(); 
+        } else {
+            document.getElementById('scoreSection').style.display = 'none';
         }
-        if(id === 'memberPanel') window.renderMembers();
-    };
+    }
+};
 
     window.goToInput = function(gameNo, teamNo) { 
         currentInputGame = gameNo;
@@ -1139,6 +1203,7 @@ window.renderCurrentGameStats = function() {
         return;
     }
 
+    // 1. 팀 순위 계산
     let teamRanks = gData.map(t => {
         let sum = (parseInt(t.matchHandy) || 0);
         t.members.forEach(m => {
@@ -1164,8 +1229,15 @@ window.renderCurrentGameStats = function() {
             </tbody>
         </table>`;
 
+    // 2. 개인 순위 계산
     let indivMap = {};
     const totalGameCount = settings.gameCount || 4; 
+
+    // ★ [여기서부터 수정됨] gameHeaders 변수 정의 추가 ★
+    let gameHeaders = "";
+    for (let i = 1; i <= totalGameCount; i++) {
+        gameHeaders += `<th>${i}G</th>`;
+    }
 
     for (let g = 1; g <= totalGameCount; g++) {
         const teams = gameTeams[g] || [];
@@ -1194,17 +1266,13 @@ window.renderCurrentGameStats = function() {
 
     const genderFilter = currentGenderFilter || 'all'; 
 
-let indivList = Object.values(indivMap)
-    .filter(p => genderFilter === 'all' || p.gender === genderFilter) 
-    .map(p => {
-        p.finalTotal = p.accumulatedTotal + (p.handicap * p.gamesPlayed);
-        return p;
-    }).sort((a, b) => b.finalTotal - a.finalTotal);
-
-    let gameHeaders = "";
-    for (let i = 1; i <= totalGameCount; i++) {
-        gameHeaders += `<th style="width:45px;">${i}G</th>`;
-    }
+    let indivList = Object.values(indivMap)
+        .filter(p => !p.name.includes("고스트")) 
+        .filter(p => genderFilter === 'all' || p.gender === genderFilter)
+        .map(p => {
+            p.finalTotal = p.accumulatedTotal + (p.handicap * p.gamesPlayed);
+            return p;
+        }).sort((a, b) => b.finalTotal - a.finalTotal);
 
     indivArea.innerHTML = `
         <div style="overflow-x:auto;">
@@ -1213,8 +1281,7 @@ let indivList = Object.values(indivMap)
                     <tr>
                         <th>순위</th>
                         <th>이름</th>
-                        ${gameHeaders}
-                        <th style="background:#fff5f5; color:#e74c3c;">합계</th>
+                        ${gameHeaders} <th style="background:#fff5f5; color:#e74c3c;">합계</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -1224,8 +1291,8 @@ let indivList = Object.values(indivMap)
                             <td style="font-weight:bold; white-space:nowrap;">${p.name}</td>
                             ${p.scores.map((s, idx) => `
                                 <td style="${(s >= 200) ? 'color:#e74c3c; font-weight:bold;' : ((idx+1) === currentStatsGame ? 'color:#222;' : 'color:#adb5bd;')} ${(idx+1) === currentStatsGame ? 'background:#e7f5ff;' : ''}">
-    ${s}
-</td>
+                                    ${s}
+                                </td>
                             `).join('')}
                             <td style="color:#e74c3c; font-weight:bold; background:#fff5f5;">${p.finalTotal}</td>
                         </tr>`).join('')}
@@ -1390,49 +1457,36 @@ window.renderTodayTotalRank = function() {
     const c = document.getElementById('laneConfigArea');
     if(!c) return;
     
-    let html = '';
     if(selectedBlocks.length === 0) { 
-        c.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:30px; color:#999; border:2px dashed #ddd; border-radius:10px;">상단의 <b>[1. 구역 선택]</b> 버튼을 눌러주세요.</div>'; 
-        document.getElementById('totalConfigCount').innerText = '0'; 
+        c.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:30px; color:#999;">[1. 구역 선택] 버튼을 눌러주세요.</div>'; 
         return; 
     }
 
+    let html = '';
     selectedBlocks.sort((a,b)=>a-b).forEach(z => {
-        const s = (z-1)*4 + 3; 
-        [s, s+1, s+2, s+3].forEach(l => {
+        const start = (z-1)*4 + 3; 
+        [start, start+1, start+2, start+3].forEach(l => {
             let valCnt = laneSettings['cnt_'+l] || 0; 
             let valTeam = laneSettings['team_'+l] || 0;
             
+            // ★ 수정: 부모 div의 onclick 제거! (충돌 방지)
             html += `
             <div class="lane-box-v13">
                 <div class="lane-label" style="font-weight:bold; color:var(--purple);">${l}L</div>
                 
-                <input type="number" 
-                       inputmode="numeric" 
-                       class="lane-input" 
-                       placeholder="인원" 
+                <input type="number" inputmode="numeric" class="lane-input" placeholder="인원"
                        value="${valCnt > 0 ? valCnt : ''}" 
-                       onfocus="if(this.value=='0') this.value='';"
                        onchange="window.updateConfig('cnt_${l}', this.value)"
-                       style="width: 100%; text-align: center; border: 1px solid #ccc; border-radius: 4px; padding: 8px; margin-top:5px; font-size:1.1rem; box-sizing:border-box;">
+                       style="width: 100%; height:40px; text-align: center; border: 1px solid #ccc; font-size:1.2rem;">
                 
-                <input type="number" 
-                       inputmode="numeric" 
-                       class="lane-input" 
-                       placeholder="팀" 
+                <input type="number" inputmode="numeric" class="lane-input" placeholder="팀"
                        value="${valTeam > 0 ? valTeam : ''}" 
-                       onfocus="if(this.value=='0') this.value='';"
                        onchange="window.updateConfig('team_${l}', this.value)"
-                       style="width: 100%; text-align: center; border: 1px solid #ccc; border-radius: 4px; padding: 8px; margin-top:5px; font-size:1.1rem; background:#f9f9f9; box-sizing:border-box;">
+                       style="width: 100%; height:40px; text-align: center; border: 1px solid #ccc; font-size:1.2rem; background:#f9f9f9;">
             </div>`;
         });
     });
-
     c.innerHTML = html;
-    let t = 0; 
-    for(let k in laneSettings) if(k.startsWith('cnt_')) t += (parseInt(laneSettings[k]) || 0);
-    const totalArea = document.getElementById('totalConfigCount');
-    if(totalArea) totalArea.innerText = t;
 };
 
 window.updateConfig = function(k, v) { 
@@ -1477,30 +1531,24 @@ window.getWeightedStats = function(name) {
 // 2. [배정 엔진] 5인조 고정, 지그재그 레인, 자동 페이지 이동
 window.runAssignment = function() {
     try {
-        console.log("🚀 [절대 복종 모드] 배정 엔진 가동...");
+        console.log("🚀 [정밀 배정 엔진] 가동 시작...");
 
-        // 1. [진짜 배정할 레인만 추출] 
-        // 구역 버튼(selectedBlocks)은 무시합니다. 오직 숫자가 있는 레인만 찾습니다.
+        // 1. [레인 확인] 관리자가 숫자를 적은 레인만 찾아냅니다.
         let targetLanes = [];
         let totalCapacity = 0;
 
-        // 1번부터 20번 레인까지 훑어서 '인원(cnt)'과 '팀번호(team)'가 적힌 레인만 수집합니다.
         for (let l = 1; l <= 20; l++) {
             let cnt = parseInt(laneSettings['cnt_' + l]) || 0;
             let team = parseInt(laneSettings['team_' + l]) || 0;
-            
             if (cnt > 0 && team > 0) {
                 targetLanes.push({ lane: l, cap: cnt, teamNo: team });
                 totalCapacity += cnt;
             }
         }
 
-        // 숫자가 적힌 레인이 하나도 없으면 경고하고 멈춥니다.
-        if (targetLanes.length === 0) {
-            return alert("❌ 오류: [3. 레인별 인원 설정]에 인원수와 팀 번호를 먼저 입력해주세요!");
-        }
+        if (targetLanes.length === 0) return alert("❌ [3. 레인별 인원 설정]에 숫자를 입력해주세요.");
 
-        // 2. [참석자 정렬 및 고스트 생성]
+        // 2. [참석자 줄 세우기]
         const rankingList = attendees
             .filter(n => n && !n.includes("고스트"))
             .map(name => ({
@@ -1509,51 +1557,44 @@ window.runAssignment = function() {
             }))
             .sort((a, b) => b.avg - a.avg);
 
-        // ★ 핵심: 관리자가 설정한 총 정원(totalCapacity)보다 실제 사람이 적을 때만 고스트를 만듭니다.
+        // ★ [문제2 해결] 무조건 5명이 아니라, '설정된 인원(totalCapacity)'까지만 고스트 생성!
         while(rankingList.length < totalCapacity) {
             rankingList.push({ name: "👻고스트", avg: 0, isGhost: true });
         }
 
-        // 3. [팀 구성] 입력된 팀 번호들에 맞춰 그릇을 만듭니다.
+        // 3. [팀 배정 로직]
         const uniqueTeamNos = [...new Set(targetLanes.map(tl => tl.teamNo))].sort((a,b)=>a-b);
         let finalTeams = uniqueTeamNos.map(tNo => ({
-            teamNo: tNo, members: [], totalAvg: 0, matchHandy: 0
+            teamNo: tNo, members: [], totalAvg: 0
         }));
 
-        // 4. [좌우 기둥 및 나머지 배치]
-        // 상위권 1그룹(좌측 기둥), 2그룹(우측 기둥) 분리
         const T = uniqueTeamNos.length;
         let topT = rankingList.slice(0, T).sort(() => Math.random() - 0.5);
-        let nextT = rankingList.slice(T, T * 2);
-        let others = rankingList.slice(T * 2);
+        let others = rankingList.slice(T);
 
-        // (1) 좌측 기둥 박기
+        // (1) 대장 배치
         finalTeams.forEach((team, i) => {
             const myLanes = targetLanes.filter(tl => tl.teamNo === team.teamNo);
             if (myLanes.length > 0 && topT[i]) {
-                topT[i].lane = myLanes[0].lane; // 해당 팀의 첫 번째 레인에 배치
+                topT[i].lane = myLanes[0].lane;
                 team.members.push(topT[i]);
                 team.totalAvg += topT[i].avg;
             }
         });
 
-        // (2) 우측 기둥 및 나머지 순차 배치
-        let allRemaining = [...nextT, ...others];
-        allRemaining.forEach(player => {
-            // 자리가 남은 팀을 찾습니다.
+        // (2) 나머지 배치
+        others.forEach(player => {
             let bestTeam = finalTeams.find(t => {
                 const teamCap = targetLanes.filter(tl => tl.teamNo === t.teamNo).reduce((sum, tl) => sum + tl.cap, 0);
                 return t.members.length < teamCap;
             });
 
             if (bestTeam) {
-                // 해당 팀의 레인 중 자리가 남은 레인을 찾습니다.
                 const myLanes = targetLanes.filter(tl => tl.teamNo === bestTeam.teamNo);
                 let targetLaneObj = myLanes.find(lObj => {
                     const currentCount = bestTeam.members.filter(m => m.lane === lObj.lane).length;
                     return currentCount < lObj.cap;
                 });
-
                 if (targetLaneObj) {
                     player.lane = targetLaneObj.lane;
                     bestTeam.members.push(player);
@@ -1562,20 +1603,30 @@ window.runAssignment = function() {
             }
         });
 
-        // 5. [마무리 및 저장]
+        // 4. [마무리 및 저장]
         const maxAvg = Math.max(...finalTeams.map(t => t.totalAvg));
         finalTeams.forEach(t => t.matchHandy = Math.max(0, Math.round(maxAvg - t.totalAvg)));
+        
         gameTeams[currentTargetGame] = finalTeams;
 
         db.ref('bowling_v14/gameTeams').set(gameTeams).then(() => {
-            alert(`✅ 설정된 ${totalCapacity}명 정원에 맞춰 배정이 완료되었습니다!`);
-            currentRankView = currentTargetGame;
-            db.ref('bowling_v14/settings').update({ currentTab: 'progressPanel', currentRankView: currentTargetGame });
-            window.showPanel('progressPanel', document.querySelectorAll('.tab-btn')[3]);
+            alert(`✅ 배정 완료!`);
+
+            // ★ [문제1, 2 해결] 강제로 현재 게임을 보여주도록 설정 업데이트
+            currentRankView = currentTargetGame; // 로컬 변수 즉시 동기화
+            
+            db.ref('bowling_v14/settings').update({ 
+                currentTab: 'progressPanel',    // 탭 이동 명령
+                currentRankView: currentTargetGame // DB에도 "지금은 1G다!"라고 알림
+            });
+
+            // 탭 버튼 강제 활성화 (인덱스 3번 = 진행)
+            const tabBtns = document.querySelectorAll('.tab-btn');
+            if(tabBtns[3]) window.showPanel('progressPanel', tabBtns[3]);
         });
 
     } catch (err) {
-        alert("🚨 실행 중 오류 발생:\n" + err.message);
+        alert("🚨 오류 발생: " + err.message);
     }
 };
 
@@ -1638,33 +1689,53 @@ window.renderGameProgress = function() {
     window.updateScore = function(n, v) { (gameTeams[currentInputGame]||[]).forEach(t => t.members.forEach(m => { if(m.name===n) m.score = parseInt(v); })); };
     
 // 기존 window.saveAllScores 함수를 찾아서 이걸로 교체하세요!
-window.saveAllScores = function() { 
-    db.ref('bowling_v14/gameTeams').set(gameTeams).then(() => {
-        
-        alert(`✅ ${currentInputGame}G 점수 저장 완료!`);
+window.saveAllScores = function() {
+    if(window.isSaving) return;
+    window.isSaving = true;
 
-        // ✅ [핵심 수정] 다음 게임 번호를 미리 계산합니다.
-        let nextGame = currentInputGame + 1;
-        // 만약 마지막 게임(4G)이라면 그냥 그대로 둡니다.
-        if (nextGame > settings.gameCount) nextGame = currentInputGame;
+    // 1. 데이터가 비어있는지 확인
+    if (!gameTeams || Object.keys(gameTeams).length === 0) {
+        window.isSaving = false;
+        return alert("🚨 저장할 데이터가 없습니다.");
+    }
 
-        // DB에 "다음엔 이 게임을 조편성할 차례야"라고 알려줍니다.
-        db.ref('bowling_v14/settings').update({ 
-            currentTab: 'statsPanel',       // 저장은 했으니 통계 화면으로 가고
-            currentStatsGame: currentInputGame, 
-            currentAssignGame: nextGame,    // ★ 조편성 탭의 목표를 다음 게임으로 변경!
-            currentRankView: currentInputGame
-        });
+    try {
+        // ★ [핵심] 데이터 세탁 과정 (Undefined 제거) ★
+        // 데이터를 문자열로 바꿨다가 다시 객체로 만들면, 
+        // 비어있는 값들이 자동으로 정리되어 DB가 좋아합니다.
+        const cleanData = JSON.parse(JSON.stringify(gameTeams));
 
-        // 탭 버튼 활성화 (통계 탭)
-        const tabBtns = document.querySelectorAll('.tab-btn');
-        if(tabBtns[5]) {
-            window.showPanel('statsPanel', tabBtns[5]);
-        }
+        let updates = {};
+        updates['bowling_v14/gameTeams'] = cleanData;
 
-    }).catch(err => {
-        alert("저장 중 오류 발생: " + err);
-    });
+        // 화면 이동 설정
+        let nextGame = (currentInputGame || 1) + 1;
+        const maxGame = settings.gameCount || 4;
+        if (nextGame > maxGame) nextGame = currentInputGame;
+
+        updates['bowling_v14/settings/currentTab'] = 'statsPanel';
+        updates['bowling_v14/settings/currentStatsGame'] = currentInputGame;
+        updates['bowling_v14/settings/currentAssignGame'] = nextGame;
+        updates['bowling_v14/settings/currentRankView'] = currentInputGame;
+
+        db.ref().update(updates)
+            .then(() => {
+                alert(`✅ ${currentInputGame}G 저장 성공!`);
+                if(document.querySelectorAll('.tab-btn')[5]) {
+                    window.showPanel('statsPanel', document.querySelectorAll('.tab-btn')[5]);
+                }
+            })
+            .catch(err => {
+                alert("❌ 저장 거부됨 (원인: " + err.message + ")");
+            })
+            .finally(() => {
+                window.isSaving = false;
+            });
+
+    } catch (e) {
+        window.isSaving = false;
+        alert("저장 준비 중 오류: " + e.message);
+    }
 };
 
 window.filterCurrentStats = function(gender, btn) {
@@ -2530,29 +2601,24 @@ if (db) {
 
 // 3. 입력창 그리기 함수 업그레이드 (포커스 감지 기능 추가)
 window.renderInputs = function() {
-    // 입력 중 화면 흔들림 방지
-    if (window.isScoreEditing) return; 
+    // 입력 중 화면 갱신 방지
+    if (window.isScoreEditing) return;
 
     const tabs = document.getElementById('inputTabs');
-    let tHtml = ''; 
+    let tHtml = '';
     for(let i=1; i<=settings.gameCount; i++) {
         tHtml += `<div class="rank-tab ${currentInputGame===i?'active':''}" onclick="currentInputGame=${i};window.renderInputs()">${i}G</div>`;
     }
     tabs.innerHTML = tHtml;
-    document.getElementById('inputGameTitle').innerText = `${currentInputGame}G`;
-    
-    let gData = gameTeams[currentInputGame] || [];
-    if(currentInputTeam) {
-        gData = gData.filter(t => t.teamNo == currentInputTeam);
-        document.getElementById('filterInfo').style.display = 'block';
-        document.getElementById('filterTeamName').innerText = `Team ${currentInputTeam}`;
-    } else {
-        document.getElementById('filterInfo').style.display = 'none';
-    }
 
     const area = document.getElementById('inputGridArea');
+    let gData = gameTeams[currentInputGame] || [];
+    
+    // 팀 필터링
+    if(currentInputTeam) gData = gData.filter(t => t.teamNo == currentInputTeam);
+
     if (!gData || gData.length === 0) {
-        area.innerHTML = '<div style="padding:40px; text-align:center; color:#999; border:2px dashed #ddd; border-radius:10px;">⚠️ 데이터가 없습니다.</div>';
+        area.innerHTML = '<div style="padding:40px; text-align:center; color:#999;">⚠️ 데이터가 없습니다.</div>';
         return;
     }
 
@@ -2561,20 +2627,16 @@ window.renderInputs = function() {
         h += `<div class="input-team-box"><div class="input-team-header">Team ${t.teamNo}</div>`;
         t.members.forEach(m => {
             const isG = m.name.includes("고스트") || m.isGhost;
-            // ★핵심 수정: div(줄 전체)를 클릭하면 -> 내부의 input을 찾아서 강제로 포커스(focus)를 줍니다.
-            // 이제 이름을 누르거나 옆에 빈 공간을 눌러도 자판이 내려가지 않습니다.
-            h += `<div class="score-row" onclick="const inp = this.querySelector('input'); if(inp) inp.focus();">
-                <span class="score-name">${m.name}</span>
-                <input type="number" 
-                       inputmode="numeric" 
-                       pattern="[0-9]*" 
-                       class="score-input" 
+            
+            h += `<div class="score-row">
+                <span class="score-name" style="flex:1;">${m.name}</span>
+                <input type="number" inputmode="numeric" pattern="[0-9]*" class="score-input"
                        value="${m.score||0}" 
                        ${isG ? 'readonly style="background:#f1f3f5; color:#777;"' : ''}
-                       onclick="event.stopPropagation();" 
                        onfocus="window.isScoreEditing=true; if(this.value=='0') this.value='';" 
-                       onblur="window.isScoreEditing=false; window.silentSave();" 
-                       oninput="if(this.value.length > 3) this.value = this.value.slice(0, 3); if(this.value > 300) this.value = 300; window.updateScore('${m.name}', this.value)">
+                       onblur="window.isScoreEditing=false;" 
+                       oninput="window.updateScore('${m.name}', this.value)"
+                       style="width:80px; height:45px; font-size:1.5rem; text-align:center;">
             </div>`;
         });
         h += `</div>`;
