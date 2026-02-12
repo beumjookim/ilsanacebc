@@ -2879,25 +2879,41 @@ function sendNotice() {
     const img = document.getElementById('noticeImg').value;
     let link = document.getElementById('noticeLink').value.trim();
 
-    // 🚨 404 에러 방지 핵심: 외부 주소(http)가 있으면 절대 우리 앱 주소를 붙이지 않음
-    if (link && !link.startsWith('http')) {
-        link = 'https://' + link;
+    // 🚨 404 에러 방지 핵심 로직 🚨
+    // 입력된 주소에 'http'가 포함되어 있다면, 절대 경로로 인식하게 만듭니다.
+    if (link) {
+        if (!link.startsWith('http')) {
+            link = 'https://' + link;
+        }
+    } else {
+        // 주소가 아예 비어있다면 기본 앱 주소로 보냅니다.
+        link = 'https://beumjookim.github.io/ilsanacebc/';
     }
 
     try {
-        if (!Kakao.isInitialized()) Kakao.init('fa7a8ba02d5835b0aa4183eac217cb7a');
+        if (!Kakao.isInitialized()) {
+            Kakao.init('fa7a8ba02d5835b0aa4183eac217cb7a');
+        }
 
+        // 카카오 전송 시 'link' 객체에 직접 link 변수를 꽂아넣어 
+        // 우리 앱 주소와 섞이지 않게 차단합니다.
         Kakao.Share.sendDefault({
             objectType: 'feed',
             content: {
                 title: title,
                 description: desc,
                 imageUrl: img,
-                link: { mobileWebUrl: link, webUrl: link } // 사진 클릭 시 해당 글로 이동
+                link: { 
+                    mobileWebUrl: link, // 👈 여기에 네이버 주소만 깨끗하게 들어감
+                    webUrl: link 
+                }
             },
             buttons: [{ 
                 title: (currentNoticeType === 'app' ? '참석 신청하기' : '게시글 바로가기'), 
-                link: { mobileWebUrl: link, webUrl: link } // 버튼 클릭 시 해당 글로 이동
+                link: { 
+                    mobileWebUrl: link, 
+                    webUrl: link 
+                }
             }]
         });
         document.getElementById('admin-notice-panel').style.display = 'none';
