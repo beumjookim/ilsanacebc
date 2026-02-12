@@ -2871,26 +2871,22 @@ function toggleNoticePanel() {
     }
 }
 
-// 2. 입력한 내용으로 카톡 보내기
-function sendNotice() {
+// 관리자 공지 발송 함수 (네이버용 / 앱 신청용 분리)
+function sendNotice(type) {
     var title = document.getElementById('noticeTitle').value || '일산 에이스 볼링 클럽';
     var desc = document.getElementById('noticeDesc').value || '새로운 공지사항이 등록되었습니다.';
-    var linkInput = document.getElementById('noticeLink').value.trim();
-
-    // 1. 링크를 입력 안 했을 때만 우리 앱 주소를 기본값으로 사용
-    var finalLink = linkInput;
-    if (!finalLink) {
-        finalLink = 'https://beumjookim.github.io/ilsanacebc/';
-    }
-
-    // 2. 관리자님이 깜빡하고 http를 안 붙여도 자동으로 붙여주는 안전장치
-    if (finalLink.indexOf('://') === -1) {
-        finalLink = 'https://' + finalLink;
-    }
+    
+    // 기본 앱 주소
+    var appLink = 'https://beumjookim.github.io/ilsanacebc/';
+    // 네이버 카페 주소
+    var cafeLink = 'https://cafe.naver.com/ilsanacebc';
+    
+    // 타입에 따라 목적지 주소 결정
+    var finalLink = (type === 'cafe') ? cafeLink : appLink;
 
     try {
         if (!Kakao.isInitialized()) {
-            Kakao.init('fa7a8ba02d5835b0aa4183eac217cb7a'); //
+            Kakao.init('fa7a8ba02d5835b0aa4183eac217cb7a');
         }
 
         Kakao.Share.sendDefault({
@@ -2899,12 +2895,19 @@ function sendNotice() {
                 title: title,
                 description: desc,
                 imageUrl: 'https://beumjookim.github.io/ilsanacebc/ace.png',
-                link: { mobileWebUrl: finalLink, webUrl: finalLink }
+                link: { 
+                    mobileWebUrl: finalLink, 
+                    webUrl: finalLink 
+                }
             },
-            buttons: [{ title: '내용 확인하기', link: { mobileWebUrl: finalLink, webUrl: finalLink } }]
+            buttons: [{ 
+                title: (type === 'cafe' ? '카페 바로가기' : '참석 신청하기'), 
+                link: { mobileWebUrl: finalLink, webUrl: finalLink } 
+            }]
         });
-    alert("공지가 전송되었습니다!"); // 성공 메시지
-        document.getElementById('admin-notice-panel').style.display = 'none'; // 창 숨기기
+        
+        alert((type === 'cafe' ? "☕ 네이버 카페" : "🎳 앱 신청") + " 공지가 전송되었습니다!");
+        document.getElementById('admin-notice-panel').style.display = 'none';
     } catch (e) {
         alert("카톡 전송 실패: " + e.message);
     }
@@ -2940,16 +2943,19 @@ function addBangaeMember() {
 <div id="admin-notice-panel" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width: 90%; max-width: 400px; background:#ffffff; z-index:10000; border:3px solid #FFEB33; padding:20px; border-radius:15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
     
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:2px solid #eee; padding-bottom:10px;">
-        <h4 style="margin:0; color:#333; font-size:1.2rem;">📢 실시간 카톡 공지</h4>
+        <h4 style="margin:0; color:#333; font-size:1.2rem;">📢 공지 선택 발송</h4>
         <button onclick="document.getElementById('admin-notice-panel').style.display='none'" style="background:none; border:none; font-size:1.8rem; cursor:pointer; line-height:1;">&times;</button>
     </div>
 
     <div style="display:flex; flex-direction:column; gap:12px;">
-        <input type="text" id="noticeTitle" placeholder="제목 (예: 2월 정기전 안내)" style="width:100%; padding:12px; border:1px solid #ddd; border-radius:8px; font-size:1rem; box-sizing:border-box;">
-        <textarea id="noticeDesc" placeholder="내용 (예: 이번주 금요일 8시! 필참!)" style="width:100%; height:120px; padding:12px; border:1px solid #ddd; border-radius:8px; font-size:1rem; resize:none; box-sizing:border-box;"></textarea>
-        <input type="text" id="noticeLink" placeholder="상세 링크 (미입력 시 앱 주소)" style="width:100%; padding:12px; border:1px solid #ddd; border-radius:8px; font-size:1rem; box-sizing:border-box;">
+        <input type="text" id="noticeTitle" placeholder="제목 (미입력 시 기본제목)" style="width:100%; padding:12px; border:1px solid #ddd; border-radius:8px; font-size:1rem; box-sizing:border-box;">
+        <textarea id="noticeDesc" placeholder="내용을 입력하세요" style="width:100%; height:100px; padding:12px; border:1px solid #ddd; border-radius:8px; font-size:1rem; resize:none; box-sizing:border-box;"></textarea>
         
-        <button onclick="sendNotice()" style="width:100%; background:#FFEB33; color:#3C1E1E; border:none; padding:15px; border-radius:10px; font-weight:bold; font-size:1.1rem; cursor:pointer; margin-top:10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">🚀 카톡으로 공지 쏘기</button>
+        <div style="display:flex; gap:10px; margin-top:10px;">
+            <button onclick="sendNotice('cafe')" style="flex:1; background:#27ae60; color:white; border:none; padding:15px; border-radius:10px; font-weight:bold; cursor:pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">☕ 카페 공지</button>
+            <button onclick="sendNotice('app')" style="flex:1; background:#3498db; color:white; border:none; padding:15px; border-radius:10px; font-weight:bold; cursor:pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">🎳 앱 신청용</button>
+        </div>
+        <p style="text-align:center; font-size:0.8rem; color:#999; margin:0;">* 버튼을 누르면 사진과 링크가 자동 연결됩니다.</p>
     </div>
 </div>
 </body>
