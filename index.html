@@ -2863,15 +2863,16 @@ function openNoticePanel(type) {
 
     panel.style.display = 'block';
 
-    // 주소 뒤에 /가 빠지면 404 에러가 날 수 있으니 정확한 주소를 넣습니다.
     if (type === 'app') {
         titleInput.value = "🎳 [참석 신청] 오늘 모임 있습니다!";
         imgInput.value = "https://beumjookim.github.io/ilsanacebc/ace.png"; 
-        linkInput.value = "https://beumjookim.github.io/ilsanacebc/"; 
+        linkInput.value = "https://beumjookim.github.io/ilsanacebc/"; // 앱 주소는 잘 됨
     } else {
+        // ⚠️ 이 부분이 네이버 카페로 가는 핵심입니다! 
+        // 주소가 정확히 'https://cafe.naver.com/ilsanacebc' 인지 다시 확인하세요.
         titleInput.value = "☕ [카페 공지] 새로운 소식을 확인하세요!";
         imgInput.value = "https://beumjookim.github.io/ilsanacebc/notice_image.png"; 
-        linkInput.value = "https://cafe.naver.com/ilsanacebc"; 
+        linkInput.value = "https://cafe.naver.com/ilsanacebc"; // ★ 여기에 오타가 없는지 확인!
     }
 }
 
@@ -2880,7 +2881,12 @@ function sendNotice() {
     const title = document.getElementById('noticeTitle').value;
     const desc = document.getElementById('noticeDesc').value || '공지 내용을 확인해 주세요.';
     const img = document.getElementById('noticeImg').value;
-    const link = document.getElementById('noticeLink').value;
+    let link = document.getElementById('noticeLink').value.trim(); // 주소 양옆 공백 제거
+
+    // 🚨 주소 보정 (http가 없으면 강제로 붙임)
+    if (link && !link.startsWith('http')) {
+        link = 'https://' + link;
+    }
 
     try {
         if (!Kakao.isInitialized()) {
@@ -2893,11 +2899,11 @@ function sendNotice() {
                 title: title,
                 description: desc,
                 imageUrl: img,
-                link: { mobileWebUrl: link, webUrl: link } // 사진 클릭 시 이동
+                link: { mobileWebUrl: link, webUrl: link } 
             },
             buttons: [{ 
                 title: (currentNoticeType === 'app' ? '참석 신청하기' : '카페 이동하기'), 
-                link: { mobileWebUrl: link, webUrl: link } // 버튼 클릭 시 이동
+                link: { mobileWebUrl: link, webUrl: link } 
             }]
         });
         document.getElementById('admin-notice-panel').style.display = 'none';
