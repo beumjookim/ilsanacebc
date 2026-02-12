@@ -297,34 +297,27 @@
 
     <div class="container" id="mainContainer" style="display:none;">
         <div class="header" style="
-    position: fixed;    /* 1. 화면에 고정! */
-    top: 0;             /* 2. 맨 위에 밀착! */
-    left: 0;            /* 3. 왼쪽 벽에 밀착! */
-    width: 100%;        /* 4. 가로로 꽉 채우기! */
-    z-index: 1000;      /* 5. 다른 내용물보다 무조건 위로! */
-    background: #ffffff; /* 6. 배경색 (안 주면 뒤에 글씨가 겹쳐 보여요!) */
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1); /* 7. (선택) 살짝 그림자를 주면 더 예뻐요 */
-    
-    padding: 10px 15px; 
-    display: flex; 
-    justify-content: space-between; 
-    align-items: center; 
-    box-sizing: border-box; /* 8. 패딩 때문에 가로가 넓어지는 걸 방지! */
+    position: fixed; top: 0; left: 0; width: 100%; z-index: 1000; background: #ffffff; 
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1); padding: 10px 15px; display: flex; 
+    justify-content: space-between; align-items: center; box-sizing: border-box;
 ">
     
     <div style="display: flex; align-items: center; gap: 12px;">
-        <h2 style="margin: 0; font-size: 0.9rem; white-space: nowrap; color: #333;">Ilsan Ace Team V1.0</h2>
+        <h2 style="margin: 0; font-size: 0.9rem; white-space: nowrap; color: #333;">Ilsan Ace Team V18.0</h2>
         
-        
-        
-        <button onclick="toggleNoticePanel()" style="background: #FFEB33; border: 1px solid #ebcf00; border-radius: 4px; padding: 3px 5px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
-            <span style="font-size: 1.1rem; line-height: 1;">📢</span>
-        </button>
+        <div style="display: flex; align-items: center; gap: 6px;">
+            <button onclick="openNoticePanel('app')" style="background: #3498db; border: 1px solid #2980b9; border-radius: 4px; padding: 4px 6px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                <span style="font-size: 1.1rem; line-height: 1;">📢</span>
+            </button>
+
+            <button onclick="openNoticePanel('cafe')" style="background: #FFEB33; border: 1px solid #ebcf00; border-radius: 4px; padding: 4px 6px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                <span style="font-size: 1.1rem; line-height: 1;">💬</span>
+            </button>
+        </div>
     </div>
 
     <div style="display: flex; align-items: center; gap: 6px;">
         <span id="userInfo" style="font-weight: bold; color: var(--primary); font-size: 0.75rem; white-space: nowrap;"></span>
-        
         <button id="logoutBtn" onclick="window.logout()" style="padding: 3px 6px; background: var(--danger); color: white; border: none; border-radius: 4px; font-size: 0.7rem; font-weight: bold; cursor: pointer; white-space: nowrap;">로그아웃</button>
     </div>
 </div>
@@ -2855,37 +2848,39 @@ window.jumpToSpecificEvent = function() {
   }
 
   
-// ==========================================
-// 📢 [추가] 관리자 공지 발송 기능
-// ==========================================
+// 🔍 이 부분을 복사해서 기존 공지 관련 함수 자리에 덮어쓰세요
 
-// 1. 공지창 열고 닫기 (토글)
-function toggleNoticePanel() {
-    var panel = document.getElementById('admin-notice-panel');
-    if (panel.style.display === 'none') {
-        panel.style.display = 'block';
-        // 창 열릴 때 제목 칸에 커서 자동 위치
-        document.getElementById('noticeTitle').focus();
+// 현재 어떤 공지를 보내는지 저장하는 변수
+let currentNoticeType = 'app'; 
+
+// 공지창 열기 (📢 또는 💬 버튼을 누를 때 실행됨)
+function openNoticePanel(type) {
+    currentNoticeType = type;
+    const panel = document.getElementById('admin-notice-panel');
+    const titleInput = document.getElementById('noticeTitle');
+    const imgInput = document.getElementById('noticeImg');
+    const linkInput = document.getElementById('noticeLink');
+
+    panel.style.display = 'block';
+
+    // 주소 뒤에 /가 빠지면 404 에러가 날 수 있으니 정확한 주소를 넣습니다.
+    if (type === 'app') {
+        titleInput.value = "🎳 [참석 신청] 오늘 모임 있습니다!";
+        imgInput.value = "https://beumjookim.github.io/ilsanacebc/ace.png"; 
+        linkInput.value = "https://beumjookim.github.io/ilsanacebc/"; 
     } else {
-        panel.style.display = 'none';
+        titleInput.value = "☕ [카페 공지] 새로운 소식을 확인하세요!";
+        imgInput.value = "https://beumjookim.github.io/ilsanacebc/notice_image.png"; 
+        linkInput.value = "https://cafe.naver.com/ilsanacebc"; 
     }
 }
 
-// 관리자 공지 발송 함수 (네이버용 / 앱 신청용 분리)
+// 카톡 전송 실행 (사진과 버튼에 링크를 완벽하게 심음)
 function sendNotice() {
-    var title = document.getElementById('noticeTitle').value || '일산 에이스 볼링 클럽';
-    var desc = document.getElementById('noticeDesc').value || '공지사항을 확인하세요.';
-    var imgUrl = document.getElementById('noticeImg').value.trim(); 
-    var linkUrl = document.getElementById('noticeLink').value.trim(); 
-
-    // 지난번 그 사진을 기본값으로 설정 (비어있을 경우)
-    var lastPhoto = 'https://beumjookim.github.io/ilsanacebc/notice_image.png'; // 지난번 사진 경로
-    var finalImg = imgUrl || lastPhoto;
-    
-    var finalLink = linkUrl || 'https://beumjookim.github.io/ilsanacebc/';
-
-    if (finalLink && !finalLink.startsWith('http')) finalLink = 'https://' + finalLink;
-    if (finalImg && !finalImg.startsWith('http')) finalImg = 'https://' + finalImg;
+    const title = document.getElementById('noticeTitle').value;
+    const desc = document.getElementById('noticeDesc').value || '공지 내용을 확인해 주세요.';
+    const img = document.getElementById('noticeImg').value;
+    const link = document.getElementById('noticeLink').value;
 
     try {
         if (!Kakao.isInitialized()) {
@@ -2897,20 +2892,16 @@ function sendNotice() {
             content: {
                 title: title,
                 description: desc,
-                imageUrl: finalImg, 
-                link: { 
-                    mobileWebUrl: finalLink, 
-                    webUrl: finalLink 
-                }
+                imageUrl: img,
+                link: { mobileWebUrl: link, webUrl: link } // 사진 클릭 시 이동
             },
             buttons: [{ 
-                title: '내용 확인하기', 
-                link: { mobileWebUrl: finalLink, webUrl: finalLink } 
+                title: (currentNoticeType === 'app' ? '참석 신청하기' : '카페 이동하기'), 
+                link: { mobileWebUrl: link, webUrl: link } // 버튼 클릭 시 이동
             }]
         });
-        
-        alert("🚀 공지가 성공적으로 전송되었습니다!");
         document.getElementById('admin-notice-panel').style.display = 'none';
+        alert("✅ 공지가 발송되었습니다!");
     } catch (e) {
         alert("카톡 전송 실패: " + e.message);
     }
