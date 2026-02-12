@@ -620,30 +620,6 @@ if (jumpTarget) sessionStorage.setItem('jumpToEvent', jumpTarget);
     firebase.initializeApp({ databaseURL: "https://ilsan-ace-bowling-team-default-rtdb.asia-southeast1.firebasedatabase.app" });
     db = firebase.database();
 
-    db.ref('bowling_v14').on('value', sn => {
-    const val = sn.val() || {};
-    
-    members = val.members ? Object.keys(val.members).map(k => ({ ...val.members[k], key: k })) : [];
-    attendees = val.attendees || [];
-    gameTeams = val.gameTeams || {};
-    records = val.records ? Object.keys(val.records).map(k => ({ ...val.records[k], key: k })) : [];
-    
-    if(val.settings) settings = val.settings;
-    if(val.managers) managers = val.managers; 
-    if(val.laneSettings) laneSettings = val.laneSettings; 
-    if(val.selectedBlocks) selectedBlocks = val.selectedBlocks; 
-    events = val.events || {};
-
-    if (!window.initialLoadDone) {
-        window.currentTargetGame = 1; 
-        window.initialLoadDone = true; 
-    }
-
-    if (typeof window.updateUI === 'function') {
-        window.updateUI();
-    }
-});
-
 
 // ========================================================
 // 🛠️ 이 덩어리를 통째로 복사해서 에러 나는 위치에 붙여넣으세요
@@ -1011,14 +987,16 @@ window.setLightningBoss = function(name) {
 window.activateSelectedEventDirect = function(id) {
     const ev = events[id];
     if(!ev) return;
-    if(confirm(`[${ev.date}] 모임 신청자 ${ev.attendees ? ev.attendees.length : 0}명으로 조편성을 시작할까요?`)) {
+    if(confirm(`[${ev.date}] 조편성을 시작할까요?`)) {
         db.ref('bowling_v14').update({
             'attendees': ev.attendees || [],
             'settings/mode': ev.mode,
             'settings/gameCount': ev.mode === 'lightning' ? 6 : 4,
-            'settings/currentTab': 'groupPanel'
+            'settings/currentTab': 'groupPanel',
+            'settings/currentAssignGame': 1, // 👈 [추가] 배정 대상을 1G로 리셋
+            'settings/currentRankView': 1,   // 👈 [추가] 보는 화면도 1G로 리셋
+            'settings/currentInputGame': 1   // 👈 [추가] 입력 화면도 1G로 리셋
         }).then(() => {
-            alert("🎯 명단이 성공적으로 로드되었습니다!");
             window.showPanel('groupPanel', document.querySelectorAll('.tab-btn')[1]);
         });
     }
@@ -1168,15 +1146,13 @@ window.startCasinoAssignment = function() {
         return alert("먼저 아래 [3. 레인별 인원 설정] 칸에 팀 번호를 입력해야 카지노 배정을 시작할 수 있습니다!");
     }
 
-    if(confirm(`${currentTargetGame}G 카지노 배정을 시작할까요?\n확인 시 모든 참가자의 화면이 카지노로 이동합니다.`)) {
-        
+    if(confirm(`${currentTargetGame}G 카지노 배정을 시작할까요?`)) {
         db.ref('bowling_v14/settings').update({
-            currentTab: 'casinoPanel',
-            currentAssignGame: currentTargetGame 
+            'currentTab': 'casinoPanel', // 👈 3. 카지노로 이동 명령
+            'currentAssignGame': currentTargetGame 
+        }).then(() => {
+            window.showPanel('casinoPanel', document.querySelectorAll('.tab-btn')[2]);
         });
-
-        const tabBtns = document.querySelectorAll('.tab-btn');
-        if(tabBtns[2]) window.showPanel('casinoPanel', tabBtns[2]);
     }
 };
 
@@ -1560,7 +1536,13 @@ window.runAssignment = function() {
                 name: name.trim(),
                 avg: (typeof window.getWeightedStats === 'function') ? window.getWeightedStats(name).weightedAvg : 0
             }))
-            .sort((a, b) => b.avg - a.avg);
+            if (settings.assignMethod === 'random') {
+            console.log("🎲 랜덤 모드: 명단을 완전히 뒤섞습니다.");
+            rankingList.sort(() => Math.random() - 0.5); // 무작위 셔플
+        } else {
+            console.log("🤖 AI 모드: 에버리지 순으로 정렬하여 밸런스를 맞춥니다.");
+            rankingList.sort((a, b) => b.avg - a.avg); // 실력순 정렬
+        }
 
         // ★ [문제2 해결] 무조건 5명이 아니라, '설정된 인원(totalCapacity)'까지만 고스트 생성!
         while(rankingList.length < totalCapacity) {
@@ -1614,24 +1596,28 @@ window.runAssignment = function() {
         
         gameTeams[currentTargetGame] = finalTeams;
 
-        db.ref('bowling_v14/gameTeams').set(gameTeams).then(() => {
-            alert(`✅ 배정 완료!`);
-
-            // ★ [문제1, 2 해결] 강제로 현재 게임을 보여주도록 설정 업데이트
-            currentRankView = currentTargetGame; // 로컬 변수 즉시 동기화
-            
-            db.ref('bowling_v14/settings').update({ 
-                currentTab: 'progressPanel',    // 탭 이동 명령
-                currentRankView: currentTargetGame // DB에도 "지금은 1G다!"라고 알림
-            });
-
-            // 탭 버튼 강제 활성화 (인덱스 3번 = 진행)
+        // 2. [핵심 수리] 팀 데이터 저장 + 화면 이동 명령을 한 번에 전송!
+        db.ref('bowling_v14').update({
+            [`gameTeams/${currentTargetGame}`]: finalTeams, // 팀 데이터 저장
+            'settings/currentTab': 'progressPanel',        // 진행 탭으로 이동
+            'settings/currentRankView': currentTargetGame  // 현재 게임 보기 설정
+        }).then(() => {
+            // 3. 로컬 화면을 먼저 즉시 전환 (막힘 없이!)
             const tabBtns = document.querySelectorAll('.tab-btn');
-            if(tabBtns[3]) window.showPanel('progressPanel', tabBtns[3]);
+            window.showPanel('progressPanel', tabBtns[3]);
+
+            // 4. 모든 작업이 끝난 뒤에 알림을 띄웁니다.
+            console.log("✅ 데이터 저장 및 화면 이동 명령 완료");
+            alert(`✅ ${currentTargetGame}G 배정이 완료되었습니다!`);
+        }).catch(err => {
+            // 5. 여기가 관리자님이 물어보신 '오류 발생' 처리 구역입니다!
+            console.error("🚨 DB 저장 중 실패:", err);
+            alert("🚨 인터넷 연결이나 권한 문제로 배정에 실패했습니다: " + err.message);
         });
 
     } catch (err) {
-        alert("🚨 오류 발생: " + err.message);
+        // 이 catch는 코드 자체의 문법 오류나 실행 오류를 잡습니다.
+        alert("🚨 로직 실행 중 오류 발생: " + err.message);
     }
 };
 
@@ -1872,6 +1858,7 @@ window.toggleEventJoin = function(id, userName) {
         // 2. [핵심 수정] 레인 설정과 구역 선택도 삭제
         updates['bowling_v14/laneSettings'] = null; 
         updates['bowling_v14/selectedBlocks'] = null; 
+        updates['bowling_v14/settings/currentAssignGame'] = 1;
 
         db.ref().update(updates).then(() => {
             // 로컬 변수도 즉시 비움 (화면 갱신용)
@@ -2280,19 +2267,19 @@ window.finishCasino = function() {
         const maxAvg = Math.max(...teamArr.map(t => t.totalAvg)); 
         teamArr.forEach(t => t.matchHandy = (t.totalAvg < maxAvg) ? Math.round(maxAvg - t.totalAvg) : 0);
             
-        // ✅ [핵심 수정] 배정된 게임 번호(currentTargetGame)로 화면을 강제 이동시킵니다!
+        // ... 칩 정산 로직 끝난 후 ...
         db.ref(`bowling_v14/gameTeams/${currentTargetGame}`).set(teamArr).then(() => {
             db.ref('bowling_v14/settings').update({
-                currentTab: 'progressPanel',      // 진행 화면으로 이동
-                currentRankView: currentTargetGame, // ★ 보여줄 게임도 현재 게임으로!
-                currentInputGame: currentTargetGame // ★ 입력할 게임도 현재 게임으로!
+                'currentTab': 'progressPanel', // 👈 4. 진행으로 이동 명령
+                'currentRankView': currentTargetGame
+            }).then(() => {
+                db.ref('bowling_v14/casino').set(null);
+                window.showPanel('progressPanel', document.querySelectorAll('.tab-btn')[3]);
+                alert(`✅ ${currentTargetGame}G 카지노 배정 종료!`);
             });
-            alert(`✅ ${currentTargetGame}G 배정 완료!`);
-            db.ref('bowling_v14/casino').set(null);
         });
-    }); 
+});
 };
-
 window.nextTeam = function(lane, current) {
     let next = (current >= 8) ? 0 : current + 1;
     window.updateConfig('team_' + lane, next);
@@ -2561,36 +2548,34 @@ window.isScoreEditing = false;
 if (db) {
     db.ref('bowling_v14').off(); 
 
-    db.ref('bowling_v14').on('value', sn => {
-        const val = sn.val() || {};
+    // ✅ [수리 완료] 통합 데이터 감시자
+db.ref('bowling_v14').on('value', sn => {
+    const val = sn.val() || {};
+    
+    members = val.members ? Object.keys(val.members).map(k => ({ ...val.members[k], key: k })) : [];
+    attendees = val.attendees || [];
+    records = val.records ? Object.keys(val.records).map(k => ({ ...val.records[k], key: k })) : [];
+    events = val.events || {};
 
-        // [핵심] 입력 중이 아닐 때만 데이터를 가져옵니다! (점수 사라짐 방지)
-        if (!window.isScoreEditing) {
-            gameTeams = val.gameTeams || {};
-        } else {
-            console.log("🛡️ 입력 중이므로 서버 데이터 덮어쓰기를 방어했습니다.");
-        }
-        
-        // 나머지 데이터는 정상적으로 업데이트
-        members = val.members ? Object.keys(val.members).map(k => ({ ...val.members[k], key: k })) : [];
-        attendees = val.attendees || [];
-        records = val.records ? Object.keys(val.records).map(k => ({ ...val.records[k], key: k })) : [];
-        if(val.settings) settings = val.settings;
-        if(val.managers) managers = val.managers;
-        if(val.laneSettings) laneSettings = val.laneSettings;
-        if(val.selectedBlocks) selectedBlocks = val.selectedBlocks;
-        events = val.events || {};
+    // [핵심] 입력 중이 아닐 때만 팀 데이터를 가져와서 점수 증발을 막습니다.
+    if (!window.isScoreEditing) {
+        gameTeams = val.gameTeams || {};
+    }
 
-        if (!window.initialLoadDone) {
-            window.currentTargetGame = 1;
-            window.initialLoadDone = true;
-        }
+    if(val.settings) settings = val.settings;
+    if(val.managers) managers = val.managers; 
+    if(val.laneSettings) laneSettings = val.laneSettings; 
+    if(val.selectedBlocks) selectedBlocks = val.selectedBlocks; 
 
-        // 입력 중이 아닐 때만 화면을 새로 그립니다 (렉 방지)
-        if (typeof window.updateUI === 'function' && !window.isScoreEditing) {
-            window.updateUI();
-        }
-    });
+    if (!window.initialLoadDone) {
+        window.currentTargetGame = 1; 
+        window.initialLoadDone = true; 
+    }
+
+    if (typeof window.updateUI === 'function' && !window.isScoreEditing) {
+        window.updateUI();
+    }
+});
 }
 
 // 3. 입력창 그리기 함수 업그레이드 (포커스 감지 기능 추가)
