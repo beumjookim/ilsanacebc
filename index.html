@@ -2877,11 +2877,14 @@ function sendNotice() {
     var desc = document.getElementById('noticeDesc').value || '새로운 공지사항이 등록되었습니다.';
     var linkInput = document.getElementById('noticeLink').value.trim();
 
-    // [핵심 수정] 링크가 비어있으면 우리 '진짜 주소'를 강제로 집어넣습니다.
-    var finalLink = linkInput ? linkInput : 'https://beumjookim.github.io/ilsanacebc/';
+    // 1. 링크를 입력 안 했을 때만 우리 앱 주소를 기본값으로 사용
+    var finalLink = linkInput;
+    if (!finalLink) {
+        finalLink = 'https://beumjookim.github.io/ilsanacebc/';
+    }
 
-    // 주소 앞에 http가 없으면 붙여주는 안전장치
-    if (finalLink && !finalLink.startsWith('http')) {
+    // 2. 관리자님이 깜빡하고 http를 안 붙여도 자동으로 붙여주는 안전장치
+    if (finalLink.indexOf('://') === -1) {
         finalLink = 'https://' + finalLink;
     }
 
