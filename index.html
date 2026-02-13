@@ -2889,11 +2889,15 @@ function openNoticePanel(type) {
 
 function sendNotice() {
     const title = document.getElementById('noticeTitle').value || '일산 에이스 공지';
-    const desc = document.getElementById('noticeDesc').value || '공지 내용을 확인해 주세요.';
-    const img = document.getElementById('noticeImg').value;
+    const desc = document.getElementById('noticeDesc').value || '상세 내용을 확인하세요.';
+    
+    // 🚨 [중요] 사진 주소를 변수에 담습니다. 
+    // 관리자님이 말씀하신 그 '단체 사진'의 절대 경로입니다.
+    const acePhotoUrl = "https://beumjookim.github.io/ilsanacebc/notice_image.png";
+    
     let link = document.getElementById('noticeLink').value.trim();
 
-    // 주소 보정 (404 방지)
+    // 주소 보정 (네이버로 정확히 보내기)
     if (link && !link.startsWith('http')) {
         link = 'https://' + link;
     }
@@ -2906,18 +2910,25 @@ function sendNotice() {
             content: {
                 title: title,
                 description: desc,
-                imageUrl: img, // 여기서 설정한 사진이 카톡에 뜹니다!
-                link: { mobileWebUrl: link, webUrl: link }
+                imageUrl: acePhotoUrl, // 👈 우리 서버 사진을 직접 꽂아줍니다.
+                link: { 
+                    mobileWebUrl: link, 
+                    webUrl: link 
+                }
             },
             buttons: [{ 
                 title: (currentNoticeType === 'app' ? '참석 신청하기' : '게시글 바로가기'), 
-                link: { mobileWebUrl: link, webUrl: link } 
+                link: { 
+                    mobileWebUrl: link, 
+                    webUrl: link 
+                }
             }]
         });
+        
         document.getElementById('admin-notice-panel').style.display = 'none';
-        alert("✅ 사진과 함께 공지가 발송되었습니다!");
+        alert("✅ 사진이 포함된 공지가 발송되었습니다!");
     } catch (e) {
-        alert("카톡 전송 실패: " + e.message);
+        alert("전송 실패: " + e.message);
     }
 }
 // ⚡ 이 코드가 있어야 '등록' 버튼이 작동합니다!
