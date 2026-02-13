@@ -1631,80 +1631,91 @@ window.getWeightedStats = function(name) {
     return { weightedAvg: weightedAvg || 0, simpleAvg12: simpleAvg12 || 0 };
 };
 
+// 🛠️ [최종 완성] 지능형 배정 엔진 (인원수 자동 계산 + 자동 밸런스)
 window.runAssignment = function() {
     try {
-        console.log("🚀 [정밀 배정 엔진] 가동 시작...");
+        console.log("🚀 지능형 배정 시작...");
+        
+        // 1. 활성화된 레인(팀 번호가 있는 곳) 찾기
+        let activeLanes = [];
+        for (let l = 1; l <= 20; l++) {
+            let t = parseInt(laneSettings['team_' + l]) || 0;
+            if (t > 0) activeLanes.push(l);
+        }
 
+        if (activeLanes.length === 0) return alert("❌ [2. 조편성] 탭 아래쪽의 '팀 번호'를 먼저 입력해주세요.");
+
+        // 2. 실제 사람 수 파악
+        const realMembers = attendees.filter(n => n && !n.includes("고스트"));
+        const totalPeople = realMembers.length;
+
+        // 🧠 [핵심 로직] 사람 수를 레인 수로 나눠서 '자동 정원' 계산
+        // 예: 5명 / 2레인 = 2.5명 -> 올림해서 '3명'을 기준 정원으로 잡음
+        let autoCap = Math.ceil(totalPeople / activeLanes.length);
+        
+        // (옵션) 너무 적으면 재미없으니 최소 3명은 유지하자 (원치 않으면 이 줄 삭제 가능)
+        // if (autoCap < 3) autoCap = 3; 
+
+        // 3. 레인별 정보 확정
         let targetLanes = [];
         let totalCapacity = 0;
 
-        for (let l = 1; l <= 20; l++) {
-            let cnt = parseInt(laneSettings['cnt_' + l]) || 0;
-            let team = parseInt(laneSettings['team_' + l]) || 0;
-            if (cnt > 0 && team > 0) {
-                targetLanes.push({ lane: l, cap: cnt, teamNo: team });
-                totalCapacity += cnt;
-            }
-        }
+        activeLanes.forEach(l => {
+            let userSetCnt = parseInt(laneSettings['cnt_' + l]) || 0;
+            let team = parseInt(laneSettings['team_' + l]);
+            
+            // 관리자가 굳이 숫자를 적었으면 그걸 따르고, 아니면 '자동 정원(autoCap)' 적용
+            let finalCnt = (userSetCnt > 0) ? userSetCnt : autoCap;
+            
+            targetLanes.push({ lane: l, cap: finalCnt, teamNo: team });
+            totalCapacity += finalCnt;
+        });
 
-        if (targetLanes.length === 0) return alert("❌ [3. 레인별 인원 설정]에 숫자를 입력해주세요.");
+        // 4. 명단 준비 (점수순/랜덤순)
+        const rankingList = realMembers.map(name => ({
+            name: name.trim(),
+            avg: (typeof window.getWeightedStats === 'function') ? window.getWeightedStats(name).weightedAvg : 0
+        }));
 
-        const rankingList = attendees
-            .filter(n => n && !n.includes("고스트"))
-            .map(name => ({
-                name: name.trim(),
-                avg: (typeof window.getWeightedStats === 'function') ? window.getWeightedStats(name).weightedAvg : 0
-            }))
-            if (settings.assignMethod === 'random') {
-            console.log("🎲 랜덤 모드: 명단을 완전히 뒤섞습니다.");
-            rankingList.sort(() => Math.random() - 0.5); 
-        } else {
-            console.log("🤖 AI 모드: 에버리지 순으로 정렬하여 밸런스를 맞춥니다.");
-            rankingList.sort((a, b) => b.avg - a.avg); 
-        }
+        if (settings.assignMethod === 'random') rankingList.sort(() => Math.random() - 0.5); 
+        else rankingList.sort((a, b) => b.avg - a.avg); 
 
+        // 👻 [자동] 모자란 자리수만큼 고스트 생성 (5명인데 6자리면 -> 고스트 1명)
         while(rankingList.length < totalCapacity) {
             rankingList.push({ name: "👻고스트", avg: 0, isGhost: true });
         }
 
+        // 5. 팀 배정 (스네이크 방식)
         const uniqueTeamNos = [...new Set(targetLanes.map(tl => tl.teamNo))].sort((a,b)=>a-b);
-        let finalTeams = uniqueTeamNos.map(tNo => ({
-            teamNo: tNo, members: [], totalAvg: 0
-        }));
+        let finalTeams = uniqueTeamNos.map(tNo => ({ teamNo: tNo, members: [], totalAvg: 0 }));
 
-        const T = uniqueTeamNos.length;
-        let topT = rankingList.slice(0, T).sort(() => Math.random() - 0.5);
-        let others = rankingList.slice(T);
-
-        finalTeams.forEach((team, i) => {
-            const myLanes = targetLanes.filter(tl => tl.teamNo === team.teamNo);
-            if (myLanes.length > 0 && topT[i]) {
-                topT[i].lane = myLanes[0].lane;
-                team.members.push(topT[i]);
-                team.totalAvg += topT[i].avg;
-            }
-        });
-
-        others.forEach(player => {
-            let bestTeam = finalTeams.find(t => {
-                const teamCap = targetLanes.filter(tl => tl.teamNo === t.teamNo).reduce((sum, tl) => sum + tl.cap, 0);
-                return t.members.length < teamCap;
-            });
-
-            if (bestTeam) {
-                const myLanes = targetLanes.filter(tl => tl.teamNo === bestTeam.teamNo);
-                let targetLaneObj = myLanes.find(lObj => {
-                    const currentCount = bestTeam.members.filter(m => m.lane === lObj.lane).length;
-                    return currentCount < lObj.cap;
-                });
-                if (targetLaneObj) {
-                    player.lane = targetLaneObj.lane;
-                    bestTeam.members.push(player);
-                    bestTeam.totalAvg += player.avg;
+        let currentTeamIdx = 0;
+        let direction = 1; 
+        
+        rankingList.forEach(player => {
+            // 들어갈 자리가 있는 팀 찾기
+            for(let k=0; k<finalTeams.length*2; k++) { 
+                const team = finalTeams[currentTeamIdx];
+                const teamLanes = targetLanes.filter(tl => tl.teamNo === team.teamNo);
+                
+                // 그 팀의 레인 중 아직 정원이 안 찬 곳 찾기
+                const targetLane = teamLanes.find(tl => team.members.filter(m => m.lane === tl.lane).length < tl.cap);
+                
+                if (targetLane) {
+                    player.lane = targetLane.lane;
+                    team.members.push(player);
+                    team.totalAvg += player.avg;
+                    break; // 배정 성공하면 루프 탈출
                 }
+                
+                // 지그재그 이동
+                currentTeamIdx += direction;
+                if (currentTeamIdx >= finalTeams.length) { currentTeamIdx = finalTeams.length - 1; direction = -1; }
+                if (currentTeamIdx < 0) { currentTeamIdx = 0; direction = 1; }
             }
         });
 
+        // 6. 결과 저장
         const maxAvg = Math.max(...finalTeams.map(t => t.totalAvg));
         finalTeams.forEach(t => t.matchHandy = Math.max(0, Math.round(maxAvg - t.totalAvg)));
         
@@ -1715,17 +1726,12 @@ window.runAssignment = function() {
             'settings/currentTab': 'progressPanel',        
             'settings/currentRankView': currentTargetGame  
         }).then(() => {
-            const tabBtns = document.querySelectorAll('.tab-btn');
-            window.showPanel('progressPanel', tabBtns[3]);
-            console.log("✅ 데이터 저장 및 화면 이동 명령 완료");
-            alert(`✅ ${currentTargetGame}G 배정이 완료되었습니다!`);
-        }).catch(err => {
-            console.error("🚨 DB 저장 중 실패:", err);
-            alert("🚨 인터넷 연결이나 권한 문제로 배정에 실패했습니다: " + err.message);
+            window.showPanel('progressPanel', document.querySelectorAll('.tab-btn')[3]);
+            alert(`✅ ${currentTargetGame}G 배정 완료! (자동 밸런스 적용)`);
         });
 
     } catch (err) {
-        alert("🚨 로직 실행 중 오류 발생: " + err.message);
+        alert("🚨 배정 오류: " + err.message);
     }
 };
 
