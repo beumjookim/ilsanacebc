@@ -647,6 +647,7 @@ db.ref('bowling_v14/casino').on('value', () => {
 });   
 
 // 3. 엔터키로 다음 입력칸 이동
+// 3. 엔터키로 다음 입력칸 이동
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') {
         const inputs = Array.from(document.querySelectorAll('.lane-input'));
@@ -658,18 +659,27 @@ document.addEventListener('keydown', function(e) {
         }
     }
 });
-// 페이지 로드 시 자동으로 실행되게 코드 맨 윗부분에 넣어주세요
-window.onload = function() {
+
+// [핵심] 페이지 로드 시 네이버 주소 있으면 자동 이동
+window.addEventListener('load', function() {
     const urlParams = new URLSearchParams(window.location.search);
     const targetUrl = urlParams.get('target');
     
     // 만약 주소에 네이버 게시글 주소가 들어있다면? 바로 그곳으로 이동!
     if (targetUrl) {
-        window.location.href = targetUrl;
+        window.location.replace(decodeURIComponent(targetUrl));
+        return;
     }
-    
-    // 기존에 있던 로직들 (loginCheck 등)은 이 아래에 그대로 두시면 됩니다.
-};function openNoticePanel(type) {
+
+    // 카카오 초기화 (안전하게 로드 후 실행)
+    try {
+        if (typeof Kakao !== 'undefined' && !Kakao.isInitialized()) {
+            Kakao.init('fa7a8ba02d5835b0aa4183eac217cb7a');
+            console.log("카카오 초기화 성공");
+        }
+    } catch (e) { console.log("카카오 체크 중"); }
+});
+
 // 4. 앱 진입 함수
 window.enterApp = function() {
     const landing = document.getElementById('landingPage');
@@ -677,40 +687,39 @@ window.enterApp = function() {
     if(typeof window.showGlobalLogin === 'function') window.showGlobalLogin();
 };
 
-    window.showGlobalLogin = function() {
-        if(localStorage.getItem('loggedInUser')) {
-            document.getElementById('landingPage').style.display = 'none';
-            document.getElementById('globalLoginScreen').style.display = 'none';
-            document.getElementById('mainContainer').style.display = 'block';
-            window.updateUI();
+window.showGlobalLogin = function() {
+    if(localStorage.getItem('loggedInUser')) {
+        document.getElementById('landingPage').style.display = 'none';
+        document.getElementById('globalLoginScreen').style.display = 'none';
+        document.getElementById('mainContainer').style.display = 'block';
+        window.updateUI();
 
-            const firstTabBtn = document.querySelectorAll('.tab-btn')[0];
-            window.showPanel('attendPanel', firstTabBtn);
-            
-        } else {
-            document.getElementById('landingPage').style.display = 'none';
-            document.getElementById('globalLoginScreen').style.display = 'flex';
-        }
-    };
+        const firstTabBtn = document.querySelectorAll('.tab-btn')[0];
+        window.showPanel('attendPanel', firstTabBtn);
+        
+    } else {
+        document.getElementById('landingPage').style.display = 'none';
+        document.getElementById('globalLoginScreen').style.display = 'flex';
+    }
+};
 
-    window.doGlobalLogin = function() {
-        const i = document.getElementById('globalId').value.trim();
-        const p = document.getElementById('globalPw').value.trim();
-        if((i==='관리자'||i==='김범주') && p==='6884') {
+window.doGlobalLogin = function() {
+    const i = document.getElementById('globalId').value.trim();
+    const p = document.getElementById('globalPw').value.trim();
+    if((i==='관리자'||i==='김범주') && p==='6884') {
+        localStorage.setItem('loggedInUser', i);
+        localStorage.setItem('ace_admin', 'true');
+        location.reload();
+    } else {
+        const m = members.find(x=>x.name===i);
+        if(m && (m.pw||'1234')===p) {
             localStorage.setItem('loggedInUser', i);
-            localStorage.setItem('ace_admin', 'true');
+            localStorage.setItem('ace_admin', 'false');
             location.reload();
-        } else {
-            const m = members.find(x=>x.name===i);
-            if(m && (m.pw||'1234')===p) {
-                localStorage.setItem('loggedInUser', i);
-                localStorage.setItem('ace_admin', 'false');
-                location.reload();
-            } else alert("로그인 실패! 이름과 비밀번호를 확인하세요.");
-        }
-    };
+        } else { alert("로그인 실패! 이름과 비밀번호를 확인하세요."); }
+    }
+};
 
-    
 window.updateUI = function() {
     if(!loggedInUser) return;
     if(window.isConfigEditing || window.isScoreEditing) return;
@@ -781,7 +790,7 @@ window.updateUI = function() {
     if(typeof window.renderMembers === 'function') window.renderMembers();
     if(typeof window.renderCasino === 'function') window.renderCasino();
     
-    // ★ [추가된 한 줄] 번개장 명단 그리기 (여기에 넣어야 확실하게 뜹니다!)
+    // ★ [추가된 한 줄] 번개장 명단 그리기
     if(typeof window.renderBungaeJangSelect === 'function') window.renderBungaeJangSelect();
 
     if(document.getElementById('groupAssignMethod')) 
@@ -791,21 +800,19 @@ window.updateUI = function() {
 
     const activePanel = document.querySelector('.panel.active');
     if(activePanel) {
-        // 진행 화면이면 점수판 다시 그리기
         if(activePanel.id === 'progressPanel' && typeof window.renderGameProgress === 'function') {
             window.renderGameProgress();
         }
-        // 입력 화면이면 입력창 다시 그리기
         if(activePanel.id === 'inputPanel' && typeof window.renderInputs === 'function') {
             window.renderInputs();
         }
-        // 통계 화면이면 통계표 다시 그리기
         if(activePanel.id === 'statsPanel' && typeof window.renderAllStats === 'function') {
             window.renderAllStats();
         }
         if(typeof window.jumpToSpecificEvent === 'function') window.jumpToSpecificEvent();
     }
 };
+
 window.createEvent = function() {
     const date = document.getElementById('eventDate').value;
     const exactTime = document.getElementById('eventExactTime').value; 
@@ -826,14 +833,16 @@ window.createEvent = function() {
         alert("✅ 모임 공지 완료!");
     });
 };
-    const formatTime = (t) => {
-        if(!t) return "";
-        let [h, m] = t.split(':');
-        h = parseInt(h);
-        const ampm = h < 12 ? '오전' : '오후';
-        h = h % 12 || 12; // 0시는 12시로 표시
-        return `${ampm} ${String(h).padStart(2, '0')}:${m}`;
-    };
+
+const formatTime = (t) => {
+    if(!t) return "";
+    let [h, m] = t.split(':');
+    h = parseInt(h);
+    const ampm = h < 12 ? '오전' : '오후';
+    h = h % 12 || 12; // 0시는 12시로 표시
+    return `${ampm} ${String(h).padStart(2, '0')}:${m}`;
+};
+
 // [번개장 선택] 참석자 명단이 쭉 뜨고, 클릭하면 바로 번개장으로 지정됩니다.
 window.renderBungaeJangSelect = function() {
     const listArea = document.getElementById('bangaeMemberList'); 
@@ -881,17 +890,7 @@ window.setLightningBoss = function(name) {
     });
 };
 
-// [번개장 저장] 라디오 버튼을 누르면 즉시 DB에 저장
-window.setLightningBoss = function(name) {
-    if(!confirm(`⚡ [${name}] 님을 번개장으로 임명하시겠습니까?`)) return;
-
-    managers.lightning = name; // 로컬 반영
-    db.ref('bowling_v14/managers/lightning').set(name).then(() => {
-        alert(`👑 ${name} 님이 번개장으로 설정되었습니다!`);
-        window.updateUI(); // 화면 갱신 (색깔 바뀌게)
-    });
-};
-    window.renderEventList = function() {
+window.renderEventList = function() {
     const area = document.getElementById('eventListArea');
     if(!area) return;
 
@@ -986,8 +985,6 @@ window.setLightningBoss = function(name) {
     area.innerHTML = html || '<div style="text-align:center; padding:50px; color:#adb5bd;">모임 일정이 없습니다.</div>';
 };
 
-
-
 window.activateSelectedEventDirect = function(id) {
     const ev = events[id];
     if(!ev) return;
@@ -997,20 +994,35 @@ window.activateSelectedEventDirect = function(id) {
             'settings/mode': ev.mode,
             'settings/gameCount': ev.mode === 'lightning' ? 6 : 4,
             'settings/currentTab': 'groupPanel',
-            'settings/currentAssignGame': 1, // 👈 [추가] 배정 대상을 1G로 리셋
-            'settings/currentRankView': 1,   // 👈 [추가] 보는 화면도 1G로 리셋
-            'settings/currentInputGame': 1   // 👈 [추가] 입력 화면도 1G로 리셋
+            'settings/currentAssignGame': 1, 
+            'settings/currentRankView': 1,   
+            'settings/currentInputGame': 1   
         }).then(() => {
             window.showPanel('groupPanel', document.querySelectorAll('.tab-btn')[1]);
         });
     }
 };
 
-window.toggleEventJoin = function(id) {
+window.toggleEventJoin = function(id, userName) {
+    const targetName = (userName || loggedInUser || "").trim();
+    
+    if(!targetName) return alert("회원 이름을 선택해주세요.");
+
+    if (!isAdmin && targetName !== loggedInUser) {
+        return alert("🚫 본인만 신청 가능합니다.");
+    }
+
     let list = (events[id] && events[id].attendees) ? [...events[id].attendees] : [];
-    if(list.includes(loggedInUser)) list = list.filter(n => n !== loggedInUser);
-    else list.push(loggedInUser);
-    db.ref('bowling_v14/events/' + id + '/attendees').set(list);
+    
+    if(list.includes(targetName)) {
+        list = list.filter(n => n !== targetName);
+    } else {
+        list.push(targetName);
+    }
+    
+    db.ref('bowling_v14/events/' + id + '/attendees').set(list).then(() => {
+        if(userName) alert(`✅ ${targetName} 님 처리 완료!`);
+    });
 };
 
 window.activateSelectedEvent = function() {
@@ -1036,41 +1048,33 @@ window.activateSelectedEvent = function() {
     }
 };
 
-    window.changeAssignMethod = function(val) {
-        if(db) {
-            db.ref('bowling_v14/settings').update({ assignMethod: val })
-                .then(() => console.log("조편성 방식 변경 완료: " + val));
-        }
-    };
-    window.showPanel = function(id, btn) {
-    // 1. 화면 전환 (탭 활성화)
+window.changeAssignMethod = function(val) {
+    if(db) {
+        db.ref('bowling_v14/settings').update({ assignMethod: val })
+            .then(() => console.log("조편성 방식 변경 완료: " + val));
+    }
+};
+
+window.showPanel = function(id, btn) {
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
     document.getElementById(id).classList.add('active');
     
-    // 2. 버튼 색깔 변경
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     if(btn) btn.classList.add('active');
 
-    // 3. 다른 탭 갔다가 오면 입력 팀 선택 해제
     if(id !== 'inputPanel') currentInputTeam = null;
 
-    // 4. 각 탭별로 실행해야 할 기능들
     if(id === 'attendPanel') window.renderAttendanceList();
     if(id === 'progressPanel') window.renderGameProgress();
     if(id === 'statsPanel') window.renderAllStats(); 
     if(id === 'memberPanel') window.renderMembers();
 
-    // ★★★ [여기가 추가된 부분입니다!] 조편성 탭 기능 ★★★
     if(id === 'groupPanel') {
-        // 게임 탭(1G, 2G...) 그리기
         if(typeof window.renderAssignGameTabs === 'function') window.renderAssignGameTabs();
-        // 레인 설정창(인원수, 팀번호) 그리기
         if(typeof window.renderCustomLaneConfig === 'function') window.renderCustomLaneConfig();
-        // [핵심] 번개장 선택용 참석자 명단 그리기!
         if(typeof window.renderBungaeJangSelect === 'function') window.renderBungaeJangSelect();
     }
 
-    // 5. 점수 입력 탭 처리
     if(id === 'inputPanel') {
         if(loggedInUser) {
             document.getElementById('scoreSection').style.display = 'block';
@@ -1081,27 +1085,25 @@ window.activateSelectedEvent = function() {
     }
 };
 
-    window.goToInput = function(gameNo, teamNo) { 
-        currentInputGame = gameNo;
-        currentInputTeam = teamNo; 
-        const tabBtns = document.querySelectorAll('.tab-btn');
-        const inputTabBtn = tabBtns[4]; 
-        window.showPanel('inputPanel', inputTabBtn); 
-    };
-    
-    window.clickInputTab = function(btn) {
-        currentInputTeam = null;
-        window.showPanel('inputPanel', btn);
-    };
-    
-    window.showAllTeams = function() {
-        currentInputTeam = null;
-        window.renderInputs();
-    };
+window.goToInput = function(gameNo, teamNo) { 
+    currentInputGame = gameNo;
+    currentInputTeam = teamNo; 
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const inputTabBtn = tabBtns[4]; 
+    window.showPanel('inputPanel', inputTabBtn); 
+};
 
-    
+window.clickInputTab = function(btn) {
+    currentInputTeam = null;
+    window.showPanel('inputPanel', btn);
+};
 
-    window.renderAssignGameTabs = function() {
+window.showAllTeams = function() {
+    currentInputTeam = null;
+    window.renderInputs();
+};
+
+window.renderAssignGameTabs = function() {
     const area = document.getElementById('assignGameTabs');
     if(!area) return;
 
@@ -1122,9 +1124,6 @@ window.setTargetGame = function(gameNo) {
     console.log(`${gameNo}G 조편성 모드로 전환!`);
 };
 
-    
-
-// 2. 버튼 클릭 시 실제 실행되는 함수 (여기서 runAssignment를 부릅니다)
 window.runGeneralAssignment = function() {
     if (gameTeams[currentTargetGame]) {
         return alert(`⚠️ 이미 ${currentTargetGame}G 팀 배정이 완료되었습니다.`);
@@ -1134,10 +1133,11 @@ window.runGeneralAssignment = function() {
         if (sn.exists()) {
             alert("🎰 카지노 배정 진행 중입니다!");
         } else {
-            window.runAssignment(); // 👈 여기서 위의 함수를 부릅니다.
+            window.runAssignment(); 
         }
     });
 };
+
 window.startCasinoAssignment = function() {
     if (gameTeams[currentTargetGame]) {
         return alert(`⚠️ 이미 ${currentTargetGame}G 팀 배정이 완료되었습니다.\n새로 하시려면 [🗑️ 초기화]를 먼저 눌러주세요.`);
@@ -1152,7 +1152,7 @@ window.startCasinoAssignment = function() {
 
     if(confirm(`${currentTargetGame}G 카지노 배정을 시작할까요?`)) {
         db.ref('bowling_v14/settings').update({
-            'currentTab': 'casinoPanel', // 👈 3. 카지노로 이동 명령
+            'currentTab': 'casinoPanel', 
             'currentAssignGame': currentTargetGame 
         }).then(() => {
             window.showPanel('casinoPanel', document.querySelectorAll('.tab-btn')[2]);
@@ -1173,6 +1173,7 @@ window.renderStatsGameTabs = function() {
     }
     area.innerHTML = html;
 };
+
 window.renderCurrentGameStats = function() {
     const teamArea = document.getElementById('currentTeamRankTable');
     const indivArea = document.getElementById('currentIndivRankTable');
@@ -1185,7 +1186,6 @@ window.renderCurrentGameStats = function() {
         return;
     }
 
-    // 1. 팀 순위 계산
     let teamRanks = gData.map(t => {
         let sum = (parseInt(t.matchHandy) || 0);
         t.members.forEach(m => {
@@ -1211,11 +1211,9 @@ window.renderCurrentGameStats = function() {
             </tbody>
         </table>`;
 
-    // 2. 개인 순위 계산
     let indivMap = {};
     const totalGameCount = settings.gameCount || 4; 
 
-    // ★ [여기서부터 수정됨] gameHeaders 변수 정의 추가 ★
     let gameHeaders = "";
     for (let i = 1; i <= totalGameCount; i++) {
         gameHeaders += `<th>${i}G</th>`;
@@ -1343,16 +1341,16 @@ window.renderHistoricalStats = function() {
 
     area.innerHTML = html + `</tbody></table>`;
 };
+
 window.setStatsPeriod = function(period, btn) {
     currentStatsPeriod = period;
-
     const filterBtns = document.querySelectorAll('#statsPanel .filter-btn');
     filterBtns.forEach(b => b.classList.remove('active')); 
     if (btn) btn.classList.add('active'); 
-
     console.log(`📅 통계 기간 변경: ${period}`);
     window.renderAllStats(); 
 };
+
 window.renderTodayTotalRank = function() {
     const totalArea = document.getElementById('todayTotalRankTable');
     if (!totalArea) return;
@@ -1390,8 +1388,8 @@ window.renderTodayTotalRank = function() {
 
     totalArea.innerHTML = totalList.length ? (totalHtml + `</tbody></table>`) : '<div style="padding:20px; text-align:center; color:#999;">오늘 데이터가 없습니다.</div>';
 };
-        
-    window.saveSettings = function() {
+
+window.saveSettings = function() {
     const mode = document.getElementById('setMode') ? document.getElementById('setMode').value : settings.mode;
     const cnt = document.getElementById('setGameCount') ? parseInt(document.getElementById('setGameCount').value) : settings.gameCount;
     const avg = parseInt(document.getElementById('setAvgCriteria').value) || 6;
@@ -1405,26 +1403,22 @@ window.renderTodayTotalRank = function() {
             assignMethod: method
         }).then(() => {
             const methodKOR = method === 'snake' ? '🐍 스네이크' : (method === 'ai' ? '🤖 AI 밸런스' : '🎲 랜덤');
-            
             alert(`✅ 운영 설정 변경 완료!\n\n` +
                   `📅 가중치 반영 기간: ${avg}개월\n` +
                   `⚖️ 기본 조편성 방식: ${methodKOR}\n\n` +
                   `[확인]을 누르면 설정이 즉시 적용됩니다.`);
-            
             location.reload(); 
         });
     }
 };
 
-    window.toggleZone = function(n) {
+window.toggleZone = function(n) {
     if(selectedBlocks.includes(n)) {
         selectedBlocks = selectedBlocks.filter(x => x !== n);
     } else {
         selectedBlocks.push(n);
     }
-    
     db.ref('bowling_v14/selectedBlocks').set(selectedBlocks);
-
     for(let i=1; i<=5; i++) {
         const b = document.getElementById('z'+i);
         if(b) {
@@ -1432,10 +1426,10 @@ window.renderTodayTotalRank = function() {
             else b.classList.remove('selected');
         }
     }
-    
     window.renderCustomLaneConfig();
 };
-    window.renderCustomLaneConfig = function() {
+
+window.renderCustomLaneConfig = function() {
     const c = document.getElementById('laneConfigArea');
     if(!c) return;
     
@@ -1452,23 +1446,23 @@ window.renderTodayTotalRank = function() {
             let valTeam = laneSettings['team_'+l] || 0;
             
             html += `
-<div class="lane-box-v13">
-    <div class="lane-label" style="font-weight:bold; color:var(--purple);">${l}L</div>
-    
-    <input type="number" inputmode="numeric" class="lane-input" placeholder="인원"
-           value="${valCnt > 0 ? valCnt : ''}" 
-           onfocus="window.isConfigEditing=true;" 
-           onblur="window.isConfigEditing=false;" 
-           onchange="window.updateConfig('cnt_${l}', this.value)"
-           style="width: 100%; height:40px; text-align: center; border: 1px solid #ccc; font-size:1.2rem;">
-    
-    <input type="number" inputmode="numeric" class="lane-input" placeholder="팀"
-           value="${valTeam > 0 ? valTeam : ''}" 
-           onfocus="window.isConfigEditing=true;" 
-           onblur="window.isConfigEditing=false;" 
-           onchange="window.updateConfig('team_${l}', this.value)"
-           style="width: 100%; height:40px; text-align: center; border: 1px solid #ccc; font-size:1.2rem; background:#f9f9f9;">
-</div>`; // <--- 이 부분의 백틱(`)과 세미콜론(;)은 이대로 두시면 됩니다!
+            <div class="lane-box-v13">
+                <div class="lane-label" style="font-weight:bold; color:var(--purple);">${l}L</div>
+                
+                <input type="number" inputmode="numeric" class="lane-input" placeholder="인원"
+                       value="${valCnt > 0 ? valCnt : ''}" 
+                       onfocus="window.isConfigEditing=true;" 
+                       onblur="window.isConfigEditing=false;" 
+                       onchange="window.updateConfig('cnt_${l}', this.value)"
+                       style="width: 100%; height:40px; text-align: center; border: 1px solid #ccc; font-size:1.2rem;">
+                
+                <input type="number" inputmode="numeric" class="lane-input" placeholder="팀"
+                       value="${valTeam > 0 ? valTeam : ''}" 
+                       onfocus="window.isConfigEditing=true;" 
+                       onblur="window.isConfigEditing=false;" 
+                       onchange="window.updateConfig('team_${l}', this.value)"
+                       style="width: 100%; height:40px; text-align: center; border: 1px solid #ccc; font-size:1.2rem; background:#f9f9f9;">
+            </div>`; 
         });
     });
     c.innerHTML = html;
@@ -1476,7 +1470,6 @@ window.renderTodayTotalRank = function() {
 
 window.updateConfig = function(k, v) { 
     laneSettings[k] = parseInt(v) || 0; 
-    
     if(db) {
         db.ref('bowling_v14/laneSettings').set(laneSettings)
             .then(() => {
@@ -1487,8 +1480,7 @@ window.updateConfig = function(k, v) {
         window.renderCustomLaneConfig(); 
     }
 };
-    
-    // 1. [실력 계산] 공식 정모 12회 기준 3:7 가중치
+
 window.getWeightedStats = function(name) {
     if (!name || name.includes("고스트")) return { weightedAvg: 0, simpleAvg12: 0 };
     const allDates = [...new Set(records.map(r => r.date))].sort().reverse().slice(0, 12);
@@ -1513,12 +1505,10 @@ window.getWeightedStats = function(name) {
     return { weightedAvg: weightedAvg || 0, simpleAvg12: simpleAvg12 || 0 };
 };
 
-// 2. [배정 엔진] 5인조 고정, 지그재그 레인, 자동 페이지 이동
 window.runAssignment = function() {
     try {
         console.log("🚀 [정밀 배정 엔진] 가동 시작...");
 
-        // 1. [레인 확인] 관리자가 숫자를 적은 레인만 찾아냅니다.
         let targetLanes = [];
         let totalCapacity = 0;
 
@@ -1533,7 +1523,6 @@ window.runAssignment = function() {
 
         if (targetLanes.length === 0) return alert("❌ [3. 레인별 인원 설정]에 숫자를 입력해주세요.");
 
-        // 2. [참석자 줄 세우기]
         const rankingList = attendees
             .filter(n => n && !n.includes("고스트"))
             .map(name => ({
@@ -1542,18 +1531,16 @@ window.runAssignment = function() {
             }))
             if (settings.assignMethod === 'random') {
             console.log("🎲 랜덤 모드: 명단을 완전히 뒤섞습니다.");
-            rankingList.sort(() => Math.random() - 0.5); // 무작위 셔플
+            rankingList.sort(() => Math.random() - 0.5); 
         } else {
             console.log("🤖 AI 모드: 에버리지 순으로 정렬하여 밸런스를 맞춥니다.");
-            rankingList.sort((a, b) => b.avg - a.avg); // 실력순 정렬
+            rankingList.sort((a, b) => b.avg - a.avg); 
         }
 
-        // ★ [문제2 해결] 무조건 5명이 아니라, '설정된 인원(totalCapacity)'까지만 고스트 생성!
         while(rankingList.length < totalCapacity) {
             rankingList.push({ name: "👻고스트", avg: 0, isGhost: true });
         }
 
-        // 3. [팀 배정 로직]
         const uniqueTeamNos = [...new Set(targetLanes.map(tl => tl.teamNo))].sort((a,b)=>a-b);
         let finalTeams = uniqueTeamNos.map(tNo => ({
             teamNo: tNo, members: [], totalAvg: 0
@@ -1563,7 +1550,6 @@ window.runAssignment = function() {
         let topT = rankingList.slice(0, T).sort(() => Math.random() - 0.5);
         let others = rankingList.slice(T);
 
-        // (1) 대장 배치
         finalTeams.forEach((team, i) => {
             const myLanes = targetLanes.filter(tl => tl.teamNo === team.teamNo);
             if (myLanes.length > 0 && topT[i]) {
@@ -1573,7 +1559,6 @@ window.runAssignment = function() {
             }
         });
 
-        // (2) 나머지 배치
         others.forEach(player => {
             let bestTeam = finalTeams.find(t => {
                 const teamCap = targetLanes.filter(tl => tl.teamNo === t.teamNo).reduce((sum, tl) => sum + tl.cap, 0);
@@ -1594,38 +1579,30 @@ window.runAssignment = function() {
             }
         });
 
-        // 4. [마무리 및 저장]
         const maxAvg = Math.max(...finalTeams.map(t => t.totalAvg));
         finalTeams.forEach(t => t.matchHandy = Math.max(0, Math.round(maxAvg - t.totalAvg)));
         
         gameTeams[currentTargetGame] = finalTeams;
 
-        // 2. [핵심 수리] 팀 데이터 저장 + 화면 이동 명령을 한 번에 전송!
         db.ref('bowling_v14').update({
-            [`gameTeams/${currentTargetGame}`]: finalTeams, // 팀 데이터 저장
-            'settings/currentTab': 'progressPanel',        // 진행 탭으로 이동
-            'settings/currentRankView': currentTargetGame  // 현재 게임 보기 설정
+            [`gameTeams/${currentTargetGame}`]: finalTeams, 
+            'settings/currentTab': 'progressPanel',        
+            'settings/currentRankView': currentTargetGame  
         }).then(() => {
-            // 3. 로컬 화면을 먼저 즉시 전환 (막힘 없이!)
             const tabBtns = document.querySelectorAll('.tab-btn');
             window.showPanel('progressPanel', tabBtns[3]);
-
-            // 4. 모든 작업이 끝난 뒤에 알림을 띄웁니다.
             console.log("✅ 데이터 저장 및 화면 이동 명령 완료");
             alert(`✅ ${currentTargetGame}G 배정이 완료되었습니다!`);
         }).catch(err => {
-            // 5. 여기가 관리자님이 물어보신 '오류 발생' 처리 구역입니다!
             console.error("🚨 DB 저장 중 실패:", err);
             alert("🚨 인터넷 연결이나 권한 문제로 배정에 실패했습니다: " + err.message);
         });
 
     } catch (err) {
-        // 이 catch는 코드 자체의 문법 오류나 실행 오류를 잡습니다.
         alert("🚨 로직 실행 중 오류 발생: " + err.message);
     }
 };
 
-// 3. [화면 출력] 가로 2열(좌3:우2), 화살표, 고스트 핸디 복구
 window.renderGameProgress = function() {
     const tBox = document.getElementById('progTabs');
     let tHtml = '';
@@ -1657,8 +1634,8 @@ window.renderGameProgress = function() {
     const cardsHtml = gData.map(t => {
         let teamSum = (parseInt(t.matchHandy) || 0);
         t.members.forEach(m => teamSum += (parseInt(m.score) || 0) + (m.name.includes("고스트") ? 0 : (parseInt(members.find(x=>x.name===m.name)?.handicap) || 0)));
-        const L = [t.members[0], t.members[2], t.members[4]]; // 1, 3, 5위
-        const R = [t.members[1], t.members[3]]; // 2, 4위
+        const L = [t.members[0], t.members[2], t.members[4]]; 
+        const R = [t.members[1], t.members[3]]; 
         return `
             <div class="team-card" style="margin-bottom:20px; border:2px solid #6c5ce7; border-radius:12px; overflow:hidden; background:white;">
                 <div class="team-header" onclick="window.goToInput(${currentRankView}, ${t.teamNo})" style="background:#6c5ce7; color:white; padding:10px 15px; display:flex; justify-content:space-between; align-items:center;">
@@ -1681,29 +1658,22 @@ window.renderGameProgress = function() {
     document.getElementById('teamCardArea').innerHTML = cardsHtml;
 };
 
-    window.updateScore = function(n, v) { (gameTeams[currentInputGame]||[]).forEach(t => t.members.forEach(m => { if(m.name===n) m.score = parseInt(v); })); };
-    
-// 기존 window.saveAllScores 함수를 찾아서 이걸로 교체하세요!
+window.updateScore = function(n, v) { (gameTeams[currentInputGame]||[]).forEach(t => t.members.forEach(m => { if(m.name===n) m.score = parseInt(v); })); };
+
 window.saveAllScores = function() {
     if(window.isSaving) return;
     window.isSaving = true;
 
-    // 1. 데이터가 비어있는지 확인
     if (!gameTeams || Object.keys(gameTeams).length === 0) {
         window.isSaving = false;
         return alert("🚨 저장할 데이터가 없습니다.");
     }
 
     try {
-        // ★ [핵심] 데이터 세탁 과정 (Undefined 제거) ★
-        // 데이터를 문자열로 바꿨다가 다시 객체로 만들면, 
-        // 비어있는 값들이 자동으로 정리되어 DB가 좋아합니다.
         const cleanData = JSON.parse(JSON.stringify(gameTeams));
-
         let updates = {};
         updates['bowling_v14/gameTeams'] = cleanData;
 
-        // 화면 이동 설정
         let nextGame = (currentInputGame || 1) + 1;
         const maxGame = settings.gameCount || 4;
         if (nextGame > maxGame) nextGame = currentInputGame;
@@ -1739,6 +1709,7 @@ window.filterCurrentStats = function(gender, btn) {
     if (btn) btn.classList.add('active');
     window.renderCurrentGameStats();
 };
+
 window.deleteEvent = function(id) {
     if (confirm("⚠️ 이 모임 공지를 삭제할까요?\n신청 명단도 모두 사라집니다.")) {
         db.ref('bowling_v14/events/' + id).remove()
@@ -1746,34 +1717,34 @@ window.deleteEvent = function(id) {
         .catch(err => alert("❌ 삭제 실패: " + err));
     }
 };
+
 window.kickMember = function(eventId, userName) {
     if(!confirm(`[${userName}] 님을 명단에서 제외할까요?`)) return;
-    
     const ev = events[eventId];
     if(!ev || !ev.attendees) return;
-    
     const newList = ev.attendees.filter(n => n !== userName);
-    
     db.ref(`bowling_v14/events/${eventId}/attendees`).set(newList)
       .then(() => alert(`${userName} 님이 제외되었습니다.`));
 };  
- window.logout = function() { localStorage.clear(); location.reload(); };
-    window.checkGender = function(sel) {
-        document.getElementById('newMemHandicap').value = (sel.value === '여' ? 12 : 0);
-    };
 
-    window.addMember = function() {
-        const nameInput = document.getElementById('newMemName');
-        const genderInput = document.getElementById('newMemGender');
-        const handicapInput = document.getElementById('newMemHandicap');
-        const name = nameInput.value.trim();
-        const gender = genderInput.value;
-        const handicap = parseInt(handicapInput.value) || 0;
-        if(!name) return alert("이름 입력!");
-        db.ref('bowling_v14/members').push({ name: name, gender: gender, handicap: handicap, pw: '1234' }).then(() => location.reload());
-    };
-    
-    window.renderAttendanceList = function() {
+window.logout = function() { localStorage.clear(); location.reload(); };
+
+window.checkGender = function(sel) {
+    document.getElementById('newMemHandicap').value = (sel.value === '여' ? 12 : 0);
+};
+
+window.addMember = function() {
+    const nameInput = document.getElementById('newMemName');
+    const genderInput = document.getElementById('newMemGender');
+    const handicapInput = document.getElementById('newMemHandicap');
+    const name = nameInput.value.trim();
+    const gender = genderInput.value;
+    const handicap = parseInt(handicapInput.value) || 0;
+    if(!name) return alert("이름 입력!");
+    db.ref('bowling_v14/members').push({ name: name, gender: gender, handicap: handicap, pw: '1234' }).then(() => location.reload());
+};
+
+window.renderAttendanceList = function() {
     const a = document.getElementById('attendListArea');
     if(!a) return;
     const sorted = members.filter(m => m.status !== '탈퇴').sort((a,b) => a.name.localeCompare(b.name));
@@ -1788,51 +1759,34 @@ window.kickMember = function(eventId, userName) {
         </div>`;
            }).join('');
         if(document.getElementById('attCount')) document.getElementById('attCount').innerText = attendees.length;
-    };
+};
 
-    
-// ========================================================
-// 🟡 [수정] 이벤트 참석 신청 (관리자 대리 신청 기능 추가)
-// ========================================================
 window.toggleEventJoin = function(id, userName) {
-    // userName이 인자로 들어오면 그 이름을 쓰고, 없으면 로그인한 본인 이름을 씁니다.
     const targetName = (userName || loggedInUser || "").trim();
-    
     if(!targetName) return alert("회원 이름을 선택해주세요.");
-
-    // 관리자가 아닌데 다른 사람을 추가하려고 하면 막습니다.
     if (!isAdmin && targetName !== loggedInUser) {
         return alert("🚫 본인만 신청 가능합니다.");
     }
-
     let list = (events[id] && events[id].attendees) ? [...events[id].attendees] : [];
-    
     if(list.includes(targetName)) {
-        // 이미 있으면 명단에서 제거
         list = list.filter(n => n !== targetName);
     } else {
-        // 없으면 명단에 추가
         list.push(targetName);
     }
-    
     db.ref('bowling_v14/events/' + id + '/attendees').set(list).then(() => {
         if(userName) alert(`✅ ${targetName} 님 처리 완료!`);
     });
 };
 
-    
+window.deleteMember = function(key) { if(confirm("삭제?")) db.ref('bowling_v14/members/' + key).remove(); };
+window.deleteAllData = function() { if(confirm("초기화?")) db.ref('bowling_v14').remove().then(() => location.reload()); };
+window.resetAttendance = function() { if(confirm("초기화?")) db.ref('bowling_v14/attendees').set([]); };
+window.closeModal = function() { document.getElementById('modalOverlay').style.display='none'; };
+window.showAttendeePopup = function() { document.getElementById('modalOverlay').style.display='flex'; document.getElementById('modalTitle').innerText = `참석자 (${attendees.length}명)`; document.getElementById('modalContent').innerHTML = attendees.join(', '); };
 
-    window.deleteMember = function(key) { if(confirm("삭제?")) db.ref('bowling_v14/members/' + key).remove(); };
-    window.deleteAllData = function() { if(confirm("초기화?")) db.ref('bowling_v14').remove().then(() => location.reload()); };
-    window.resetAttendance = function() { if(confirm("초기화?")) db.ref('bowling_v14/attendees').set([]); };
-    window.closeModal = function() { document.getElementById('modalOverlay').style.display='none'; };
-    window.showAttendeePopup = function() { document.getElementById('modalOverlay').style.display='flex'; document.getElementById('modalTitle').innerText = `참석자 (${attendees.length}명)`; document.getElementById('modalContent').innerHTML = attendees.join(', '); };
-    window.toggleMode = function() {
-    
+window.toggleMode = function() {
     const nextMode = settings.mode === 'regular' ? 'lightning' : 'regular';
-    
     const nextGameCount = (nextMode === 'lightning') ? 6 : 4;
-
     db.ref('bowling_v14/settings').update({ 
         mode: nextMode, 
         gameCount: nextGameCount, 
@@ -1842,61 +1796,47 @@ window.toggleEventJoin = function(id, userName) {
         alert(`${modeName} 모드로 전환되었습니다!`);
     });
 };
-    window.resetAssignment = function() {
+
+window.resetAssignment = function() {
     const myName = (loggedInUser || "").trim();
     const isBoss = isAdmin || (managers.jungmo === myName) || (managers.lightning === myName);
-
     if (!isBoss) {
         return alert("🚫 초기화 권한이 없습니다.");
     }
-
     const gIdx = currentTargetGame; 
     if (confirm(`⚠️ [완전 초기화] 현재 [${gIdx}G]의 팀 배정 결과와\n입력된 '레인/팀 설정'을 모두 삭제하시겠습니까?`)) {
-        
         let updates = {};
-        // 1. 결과 삭제
         updates[`bowling_v14/gameTeams/${gIdx}`] = null;
         updates['bowling_v14/casino'] = null;
         updates['bowling_v14/managers/lightning'] = null;
-
-        // 2. [핵심 수정] 레인 설정과 구역 선택도 삭제
         updates['bowling_v14/laneSettings'] = null; 
         updates['bowling_v14/selectedBlocks'] = null; 
         updates['bowling_v14/settings/currentAssignGame'] = 1;
 
         db.ref().update(updates).then(() => {
-            // 로컬 변수도 즉시 비움 (화면 갱신용)
             if(gameTeams[gIdx]) delete gameTeams[gIdx];
             laneSettings = {};
             selectedBlocks = [];
-
-            // 구역 버튼 색깔 빼기
             document.querySelectorAll('.zone-btn').forEach(b => b.classList.remove('selected'));
-
             alert(`✅ ${gIdx}G 배정 결과와 설정이 깨끗하게 초기화되었습니다.`);
-            
-            // 화면 즉시 갱신
             if(window.renderCustomLaneConfig) window.renderCustomLaneConfig();
             if(window.renderAssignGameTabs) window.renderAssignGameTabs();
             if(window.updateUI) window.updateUI(); 
         });
     }
 };
-    window.saveHistory = function() { if(!gameTeams[currentRankView]) return; const h = { date: new Date().toISOString().split('T')[0], game: currentRankView, teams: gameTeams[currentRankView] }; db.ref('bowling_v14/history').push(h).then(() => alert("저장됨")); };
-    
- window.viewHistory = function() { db.ref('bowling_v14/history').limitToLast(5).once('value', sn => { const val = sn.val(); if(!val) return alert("기록없음"); let msg = "📜 최근기록\n"; Object.values(val).reverse().forEach(h => msg += `[${h.date} ${h.game}G]\n`); alert(msg); }); };
-    
+
+window.saveHistory = function() { if(!gameTeams[currentRankView]) return; const h = { date: new Date().toISOString().split('T')[0], game: currentRankView, teams: gameTeams[currentRankView] }; db.ref('bowling_v14/history').push(h).then(() => alert("저장됨")); };
+window.viewHistory = function() { db.ref('bowling_v14/history').limitToLast(5).once('value', sn => { const val = sn.val(); if(!val) return alert("기록없음"); let msg = "📜 최근기록\n"; Object.values(val).reverse().forEach(h => msg += `[${h.date} ${h.game}G]\n`); alert(msg); }); };
+
 window.exportData = function() {
     if(!confirm("현재의 모든 데이터를 JSON 파일로 백업하시겠습니까?")) return;
-
     db.ref('bowling_v14').once('value', sn => {
         const data = sn.val();
         if(!data) return alert("내보낼 데이터가 없습니다.");
-
         const fileName = `AceBowling_Backup_${new Date().toISOString().split('T')[0]}.json`;
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
-        
         const a = document.createElement('a');
         a.href = url;
         a.download = fileName;
@@ -1904,7 +1844,6 @@ window.exportData = function() {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        
         alert("✅ 백업 파일(JSON)이 다운로드 폴더에 저장되었습니다.");
     });
 };
@@ -1912,21 +1851,17 @@ window.exportData = function() {
 window.importData = function(event) {
     const file = event.target.files[0];
     if (!file) return;
-
     if (!confirm("⚠️ 주의: 이 파일을 불러오면 현재의 모든 데이터가 삭제되고 파일 내용으로 덮어씌워집니다.\n정말로 진행하시겠습니까?")) {
         event.target.value = ''; 
         return;
     }
-
     const reader = new FileReader();
     reader.onload = function(e) {
         try {
             const importedData = JSON.parse(e.target.result);
-            
             if(!importedData.members && !importedData.records) {
                 throw new Error("올바른 에이스 볼링 백업 파일이 아닙니다.");
             }
-
             db.ref('bowling_v14').set(importedData).then(() => {
                 alert("🎉 데이터 복구 성공! 앱을 새로고침합니다.");
                 location.reload();
@@ -1936,35 +1871,29 @@ window.importData = function(event) {
         }
     };
     reader.readAsText(file);
-};;
+};
+
 window.downloadExcel = function() {
     db.ref('bowling_v14/records').once('value', (snapshot) => {
         const records = snapshot.val();
         if (!records) return alert("내보낼 데이터가 없습니다.");
-
         const allDates = [...new Set(Object.values(records).map(r => r.date))].sort();
         const allNames = [...new Set(Object.values(records).map(r => r.name))].sort();
-
         const header1 = ["이름", "평균", "합계"];
         const header2 = ["", "", ""];
-        
         allDates.forEach(date => {
             header1.push(date, "", "", ""); 
             header2.push("1G", "2G", "3G", "4G");
         });
-
         const excelRows = [header1, header2];
-
         allNames.forEach(name => {
             const row = [name];
             let totalSum = 0;
             let totalGames = 0;
             const scoreCells = [];
-
             allDates.forEach(date => {
                 const key = `${date}_${name.replace(/[.#$/[\]]/g, "_")}`;
                 const rec = records[key];
-                
                 if (rec && rec.scs) {
                     const scs = rec.scs;
                     scoreCells.push(scs[0] || "", scs[1] || "", scs[2] || "", scs[3] || "");
@@ -1974,25 +1903,21 @@ window.downloadExcel = function() {
                     scoreCells.push("", "", "", ""); 
                 }
             });
-
             const avg = totalGames > 0 ? (totalSum / totalGames).toFixed(1) : 0;
             row.push(avg, totalSum, ...scoreCells);
             excelRows.push(row);
         });
-
         const worksheet = XLSX.utils.aoa_to_sheet(excelRows);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "전체기록");
-
         const dateStr = new Date().toISOString().split('T')[0];
         XLSX.writeFile(workbook, `에이스볼링_장부_${dateStr}.xlsx`);
     });
 };
+
 window.deleteToday = function() {
     if (confirm("⚠️ [주의] 오늘 생성된 1~6G 조편성과 점수를 모두 삭제하시겠습니까?\n(회원 명단과 가중치 설정은 안전하게 유지됩니다.)")) {
-        
         const check = prompt("정말 삭제하시려면 '삭제'라고 정확히 입력해 주세요.");
-        
         if (check === "삭제") {
             db.ref('bowling_v14/gameTeams').remove()
                 .then(() => {
@@ -2006,77 +1931,62 @@ window.deleteToday = function() {
     }
 };
 
-    window.deleteAllData = function() {
-        if (confirm("🚨 [경고] 회원 명단, 모든 과거 기록, 설정이 통째로 날아갑니다!")) {
-            const check = prompt("데이터를 완전히 초기화하려면 '삭제'라고 정확히 입력해 주세요.");
-            if (check === "삭제") {
-                db.ref('bowling_v14').remove()
-                    .then(() => {
-                        alert("💥 모든 데이터가 초기화되었습니다. 앱을 처음부터 다시 시작합니다.");
-                        location.reload();
-                    })
-                    .catch(err => alert("❌ 초기화 오류: " + err));
-            } else {
-                alert("입력이 틀렸습니다. 삭제를 취소합니다.");
-            }
-        }
-    };
-
-    window.resetAttendance = function() {
-        if (confirm("🔄 현재 참석 체크된 인원들을 모두 해제하시겠습니까?")) {
-            db.ref('bowling_v14/attendees').set([])
+window.deleteAllData = function() {
+    if (confirm("🚨 [경고] 회원 명단, 모든 과거 기록, 설정이 통째로 날아갑니다!")) {
+        const check = prompt("데이터를 완전히 초기화하려면 '삭제'라고 정확히 입력해 주세요.");
+        if (check === "삭제") {
+            db.ref('bowling_v14').remove()
                 .then(() => {
-                    alert("✅ 참석 명단이 초기화되었습니다.");
-                    if(window.renderAttendanceList) window.renderAttendanceList();
+                    alert("💥 모든 데이터가 초기화되었습니다. 앱을 처음부터 다시 시작합니다.");
+                    location.reload();
                 })
-                .catch(err => alert("❌ 초기화 중 오류: " + err));
+                .catch(err => alert("❌ 초기화 오류: " + err));
+        } else {
+            alert("입력이 틀렸습니다. 삭제를 취소합니다.");
         }
-    };
+    }
+};
 
-    
-    window.uploadExcel = function() {
-        alert("엑셀 일괄 등록 기능은 현재 개발 준비 중입니다.");
-    };
-/* 💾 [저장된 로직 적용] 
-   - 전체 회원이 아닌, '오늘 참석자' 기준 상대평가 
-   - 팀 수(T)에 따라 유동적으로 등급 부여 (절대평가 X)
-*/
+window.resetAttendance = function() {
+    if (confirm("🔄 현재 참석 체크된 인원들을 모두 해제하시겠습니까?")) {
+        db.ref('bowling_v14/attendees').set([])
+            .then(() => {
+                alert("✅ 참석 명단이 초기화되었습니다.");
+                if(window.renderAttendanceList) window.renderAttendanceList();
+            })
+            .catch(err => alert("❌ 초기화 중 오류: " + err));
+    }
+};
+
+window.uploadExcel = function() {
+    alert("엑셀 일괄 등록 기능은 현재 개발 준비 중입니다.");
+};
+
 window.getMyTier = function() {
     const myName = (loggedInUser || "").trim();
     if(!myName || !attendees.length) return null;
-    
-    // 1. [오늘의 줄 세우기] 참석자만 에버순 정렬
     const rankingList = attendees
         .filter(n => !n.includes("고스트")) 
         .map(name => {
             const stats = window.getWeightedStats(name);
             return { name: name.trim(), avg: parseFloat(stats.weightedAvg) || 0 };
         });
-    rankingList.sort((a, b) => b.avg - a.avg); // 1등이 맨 앞
-
+    rankingList.sort((a, b) => b.avg - a.avg); 
     const myRank = rankingList.findIndex(player => player.name === myName);
     if(myRank === -1) return null;
-
-    // 2. [오늘의 커트라인] 팀 수(T) 계산
-    // (레인 설정이 없어도 참석자 수에 맞춰 자동으로 비율을 나눕니다)
     let teamList = [];
     for(let k in laneSettings) {
         if(k.startsWith('team_') && parseInt(laneSettings[k]) > 0) {
             teamList.push(parseInt(laneSettings[k]));
         }
     }
-    
-    // 기본적으로 설정된 팀 수를 따르되, 
-    // 설정이 없거나 이상하면 '전체 인원 / 4'로 자동 계산하여 유동성을 줍니다.
     let T = [...new Set(teamList)].length;
     if (T < 1) T = Math.ceil(rankingList.length / 4); 
-    if (T < 1) T = 1; // 최소 방어 코드
-
-    // 3. [상대평가 판정] 내 등수가 커트라인 안쪽인가?
-    if(myRank < T) return 'red';               // 상위 1그룹
-    if(myRank < T * 2) return 'blue';          // 상위 2그룹 (3~4등도 여기 포함됨!)
-    if(myRank < T * 3) return 'green';         // 상위 3그룹
-    return 'yellow';                           // 나머지
+    if (T < 1) T = 1; 
+    if(myRank < T) return 'red';               
+    if(myRank < T * 2) return 'blue';          
+    if(myRank < T * 3) return 'green';         
+    return 'yellow';                           
 };
 
 window.initCasino = function() {
@@ -2085,15 +1995,13 @@ window.initCasino = function() {
     if(!attendees || attendees.length === 0) return alert("참석자를 먼저 체크해주세요.");
 
     let teamPools = {}; 
-    let maxTeamSize = 0; // 팀당 최대 인원수 확인용
+    let maxTeamSize = 0; 
 
-    // 1. 설정된 레인 정보를 바탕으로 팀별 자리를 모읍니다.
     selectedBlocks.forEach(z => {
         const start = (z - 1) * 4 + 3;
         for(let l = start; l < start + 4; l++) {
             let count = parseInt(laneSettings['cnt_' + l]) || 0;
             let teamNum = parseInt(laneSettings['team_' + l]) || 0;
-            
             if(count > 0 && teamNum > 0) {
                 if(!teamPools[teamNum]) teamPools[teamNum] = [];
                 for(let i = 0; i < count; i++) {
@@ -2109,20 +2017,17 @@ window.initCasino = function() {
 
     if(T === 0) return alert("🚩 조편성 하단에 '팀 번호'를 입력해야 합니다!");
 
-    // 2. 카지노 상태 초기화 (Yellow 이후 등급도 수용 가능하도록 설계)
     let casinoState = { 
         settings: { status: 'open', totalSlots: attendees.length }, 
         red: {}, blue: {}, green: {}, yellow: {} 
     };
 
-    // 각 팀의 레인들을 랜덤하게 섞습니다.
     uniqueTeamNos.forEach(tNo => teamPools[tNo].sort(() => Math.random() - 0.5));
 
-    // 3. [핵심] 팀당 최대 인원수(예: 5명)만큼 반복하며 칩을 생성합니다.
-    const tiers = ['red', 'blue', 'green', 'yellow', 'yellow']; // 4, 5번째는 모두 노란색
+    const tiers = ['red', 'blue', 'green', 'yellow', 'yellow']; 
 
     for(let round = 0; round < maxTeamSize; round++) {
-        const currentTier = tiers[round] || 'yellow'; // 5번째 이후도 노란색 처리
+        const currentTier = tiers[round] || 'yellow'; 
         let tierLanes = []; 
 
         uniqueTeamNos.forEach((tNo) => {
@@ -2131,11 +2036,9 @@ window.initCasino = function() {
             }
         });
 
-        // 같은 등급 내에서도 레인이 섞이도록 랜덤 셔플
         tierLanes.sort(() => Math.random() - 0.5);
 
         tierLanes.forEach((laneNum, idx) => {
-            // 기존 칩 개수를 확인하여 다음 ID 부여
             const nextId = Object.keys(casinoState[currentTier]).length + 1;
             casinoState[currentTier][nextId] = {
                 status: 'idle',
@@ -2145,11 +2048,11 @@ window.initCasino = function() {
         });
     }
 
-    // 4. DB 저장
     db.ref('bowling_v14/casino').set(casinoState).then(() => {
         alert(`🎰 칩 생성 완료!\n- 참여인원: ${attendees.length}명\n- 5인조 대응 칩 세팅이 완료되었습니다.`);
     });
 };
+
 window.renderCasino = function() {
     db.ref('bowling_v14/casino').once('value', sn => {
         const data = sn.val() || {};
@@ -2186,15 +2089,11 @@ window.renderCasino = function() {
         });
     });
 };
-/* 수정된 엄격한 칩 선택 함수 
-   - 정모장/번개장도 예외 없음! 무조건 자기 색깔만 선택 가능
-   - 오직 '찐 관리자'만 아무거나 선택 가능
-*/
+
 window.pickChip = function(tier, id) {
     const myTier = window.getMyTier(); 
     const myName = (loggedInUser || "").trim();
     
-    // [수정] 관리자 예외 삭제: 누구나 자기 티어 칩만 선택 가능
     if (!myTier) return alert("🚫 명단에 없는 유저입니다. (참석 체크 확인)");
     
     if (tier !== myTier) {
@@ -2224,7 +2123,6 @@ window.pickChip = function(tier, id) {
     }); 
 }; 
 
-// 기존 window.finishCasino 함수를 찾아서 이걸로 통째로 바꾸세요!
 window.finishCasino = function() {
     const myName = (loggedInUser || "").trim();
     const isBoss = isAdmin || (managers.jungmo === myName) || (managers.lightning === myName);
@@ -2235,10 +2133,6 @@ window.finishCasino = function() {
     db.ref('bowling_v14/casino').once('value', sn => {
         const data = sn.val() || {};
         
-        // ... (중간 생략: 칩 계산 로직은 그대로 둠) ...
-        // 편의상 이 부분은 기존 로직을 그대로 사용하므로, 
-        // ★★★ 아래의 db.ref 저장 부분만 확실하게 확인해주세요! ★★★
-
         let pickedOwners = [];
         ['red', 'blue', 'green', 'yellow', 'purple'].forEach(t => {
             if(data[t]) Object.values(data[t]).forEach(c => { if(c.status==='picked') pickedOwners.push(c.owner); });
@@ -2271,10 +2165,9 @@ window.finishCasino = function() {
         const maxAvg = Math.max(...teamArr.map(t => t.totalAvg)); 
         teamArr.forEach(t => t.matchHandy = (t.totalAvg < maxAvg) ? Math.round(maxAvg - t.totalAvg) : 0);
             
-        // ... 칩 정산 로직 끝난 후 ...
         db.ref(`bowling_v14/gameTeams/${currentTargetGame}`).set(teamArr).then(() => {
             db.ref('bowling_v14/settings').update({
-                'currentTab': 'progressPanel', // 👈 4. 진행으로 이동 명령
+                'currentTab': 'progressPanel',
                 'currentRankView': currentTargetGame
             }).then(() => {
                 db.ref('bowling_v14/casino').set(null);
@@ -2284,179 +2177,17 @@ window.finishCasino = function() {
         });
 });
 };
+
 window.nextTeam = function(lane, current) {
     let next = (current >= 8) ? 0 : current + 1;
     window.updateConfig('team_' + lane, next);
 };
-    const now = new Date();
-const offset = now.getTimezoneOffset() * 60000;
-const finalToday = new Date(now.getTime() - offset).toISOString().split('T')[0];
-    if(document.getElementById('progDate')) document.getElementById('progDate').value = finalToday;
-    if(document.getElementById('inputDate')) document.getElementById('inputDate').value = finalToday;
 
-(function() {
-    const el = document.getElementById('excelInput');
-    if (!el) return;
+if(document.getElementById('progDate')) document.getElementById('progDate').value = new Date().toISOString().split('T')[0];
+if(document.getElementById('inputDate')) document.getElementById('inputDate').value = new Date().toISOString().split('T')[0];
 
-    el.onclick = function() { this.value = null; };
-
-    el.onchange = function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        alert("📊 파일을 읽고 분석하는 중입니다. 잠시만 기다려주세요...");
-
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            try {
-                const data = new Uint8Array(e.target.result);
-                const workbook = XLSX.read(data, { type: 'array' });
-                const sheet = workbook.Sheets[workbook.SheetNames[0]];
-                const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-
-                if (rows.length < 2) return alert("❌ 데이터가 부족합니다.");
-
-                const headers = rows[0];
-                const dataRows = rows.slice(1);
-                
-                let lastDate = "";
-                const dateMap = headers.map((h, i) => {
-                    if (i < 3) return null; 
-                    if (h) {
-                        let d = h.toString().split('.')[0].trim();
-                        if(d.length === 8) d = `${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}`;
-                        lastDate = d;
-                    }
-                    return lastDate;
-                });
-
-                let promises = []; 
-                let memCnt = 0;
-
-                dataRows.forEach((row) => {
-                    const name = (row[2] || "").toString().trim();
-                    if (!name || name === "이름") return;
-
-                    if (!members.some(m => m.name === name)) {
-                        promises.push(db.ref('bowling_v14/members').push({ name, gender: '남', handicap: 0, pw: '1234' }));
-                        memCnt++;
-                    }
-
-                    let dayScores = {};
-                    dateMap.forEach((date, idx) => {
-                        if (!date) return;
-                        const s = parseInt(row[idx]);
-                        if (!isNaN(s) && s > 0) {
-                            if (!dayScores[date]) dayScores[date] = [];
-                            dayScores[date].push(s);
-                        }
-                    });
-
-                    Object.keys(dayScores).forEach(date => {
-                        const key = `${date}_${name.replace(/[.#$/[\]]/g, "_")}`;
-                        promises.push(db.ref(`bowling_v14/records/${key}`).set({ 
-                            date: date, name: name, scs: dayScores[date] 
-                        }));
-                    });
-                });
-
-                Promise.all(promises).then(() => {
-                    alert(`✅ 업로드 완료!\n- 신규 등록: ${memCnt}명\n- 총 ${promises.length}건의 기록이 안전하게 저장되었습니다.`);
-                    location.reload();
-                }).catch(err => {
-                    alert("❌ 저장 중 오류 발생: " + err.message);
-                });
-
-            } catch (err) {
-                alert("❌ 엑셀 판독 에러: " + err.message);
-            }
-        };
-        reader.readAsArrayBuffer(file);
-    };
-})();
-
-window.updateMember = function(key, name, currentHandy, currentGender) {
-    const newGender = prompt(`${name}님의 성별을 입력하세요 (남/여):`, currentGender || '남');
-    if (newGender === null) return;
-
-    const newHandy = prompt(`${name}님의 새로운 핸디캡을 입력하세요:`, currentHandy);
-    if (newHandy === null) return;
-
-    db.ref('bowling_v14/members/' + key).update({ 
-        gender: newGender, 
-        handicap: parseInt(newHandy) || 0 
-    }).then(() => alert("✅ 정보 수정이 완료되었습니다."));
-};
-
-window.updatePw = function(key, name, currentPw) {
-    const newPw = prompt(`${name}님의 새로운 비밀번호를 입력하세요:`, currentPw);
-    if (newPw) {
-        db.ref('bowling_v14/members/' + key).update({ pw: newPw })
-          .then(() => alert("✅ 비밀번호가 변경되었습니다."));
-    }
-};
-
-window.deleteMember = function(key, name) {
-    if(confirm(`🚨 [${name}] 회원을 정말로 삭제하시겠습니까?\n모든 기록이 사라지며 복구할 수 없습니다.`)) {
-        db.ref('bowling_v14/members/' + key).remove()
-          .then(() => alert("🗑️ 삭제가 완료되었습니다."));
-    }
-};
-
-window.renderMembers = function() { 
-    const area = document.getElementById('memberListArea'); 
-    if(!area) return; 
-
-    if(!members || members.length === 0) {
-        area.innerHTML = '<div style="padding:20px; text-align:center; color:#999;">회원 데이터를 불러오는 중입니다...</div>';
-        return;
-    }
-
-    area.innerHTML = members.sort((a,b)=>a.name.localeCompare(b.name)).map(m => `
-        <div class="member-row" style="padding: 15px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;">
-            <div style="display:flex; flex-direction:column;">
-                <b style="font-size:1.2rem; color:#333;">${m.name}</b>
-                <span style="font-size:0.9rem; color:#666;">
-                    ${m.gender || '남'} / <span style="color:var(--purple); font-weight:bold;">H:${m.handicap || 0}</span>
-                </span>
-            </div>
-            <div style="display:flex; gap:8px;">
-                <button class="btn-sm" style="background:var(--accent); color:white; border:none; padding:8px 12px; border-radius:5px;" 
-                    onclick="window.updateMember('${m.key}', '${m.name}', ${m.handicap}, '${m.gender||'남'}')">수정</button>
-                
-                <button class="btn-sm" style="background:var(--warning); color:white; border:none; padding:8px 12px; border-radius:5px;" 
-                    onclick="window.updatePw('${m.key}', '${m.name}', '${m.pw||'1234'}')">비번</button>
-                
-                <button class="btn-sm" style="background:var(--danger); color:white; border:none; padding:8px 12px; border-radius:5px;" 
-                    onclick="window.deleteMember('${m.key}', '${m.name}')">삭제</button>
-            </div>
-        </div>
-    `).join(''); 
-};
-// =========================================================
-// 1. [복구] 정기 모임 저장 함수 (이게 깨져 있었습니다)
-// =========================================================
-
-
-// =========================================================
-// 2. [신규] 번개 히스토리 기능 (저장/감지/불러오기 통합)
-// =========================================================
-
-// =========================================================
-// 🟡 [최종 수정] 번개 히스토리 (기억력 강화 버전)
-// =========================================================
-
-// 전역 변수에 데이터를 담아둡니다 (이게 기억력의 핵심!)
 window.lightningHistoryCache = null;
 
-// =========================================================
-// 🟡 [최종 정밀 수정] 번개 히스토리 기능 (저장 및 실시간 표시)
-// =========================================================
-
-// 1. 데이터를 담아둘 전역 주머니 (파일 최상단이 아니어도 작동하도록 여기에 배치)
-window.lightningHistoryCache = null;
-
-// 2. 번개 기록 저장 함수
 window.saveLightningHistory = function() {
     const now = new Date();
     const offset = now.getTimezoneOffset() * 60000;
@@ -2464,34 +2195,29 @@ window.saveLightningHistory = function() {
 
     if(!confirm(`${today} 번개 기록을 히스토리에 보관할까요?\n(개인 에버에는 반영되지 않습니다)`)) return;
 
-    // 현재 화면에 있는 팀/점수 데이터를 그대로 서버에 보냅니다.
     db.ref('bowling_v14/lightning_history/' + today).set({
         date: today,
-        gameTeams: gameTeams, // 전역 변수 gameTeams 사용
+        gameTeams: gameTeams,
         settings: settings || {} 
     }).then(() => {
         alert("🎯 번개 히스토리에 안전하게 저장되었습니다!");
-        // 저장이 완료되면 서버 감시자(Listener)가 알아서 버튼을 새로 그립니다.
     }).catch(err => {
         alert("❌ 저장 실패: " + err.message);
     });
 };
 
-// 3. [핵심] 실시간 감시자 (서버에 데이터가 들어오면 즉시 주머니에 넣고 버튼 그리기)
 db.ref('bowling_v14/lightning_history').on('value', sn => {
     const data = sn.val();
-    window.lightningHistoryCache = data || {}; // 주머니에 저장
+    window.lightningHistoryCache = data || {}; 
     
-    // 만약 현재 통계 페이지를 보고 있다면 버튼을 즉시 그려줍니다.
     if(typeof window.renderLightningHistoryButtons === 'function') {
         window.renderLightningHistoryButtons();
     }
 });
 
-// 4. 날짜 버튼 목록 그리기 (통계 탭 열 때 호출됨)
 window.renderLightningHistoryButtons = function() {
     const btnArea = document.getElementById('lightningDateButtons');
-    if(!btnArea) return; // 버튼 넣을 자리가 없으면 중단
+    if(!btnArea) return; 
 
     const data = window.lightningHistoryCache;
     if(!data) {
@@ -2499,7 +2225,7 @@ window.renderLightningHistoryButtons = function() {
         return;
     }
 
-    const dates = Object.keys(data).sort().reverse().slice(0, 4); // 최신순 4개
+    const dates = Object.keys(data).sort().reverse().slice(0, 4); 
 
     if(dates.length === 0) {
         btnArea.innerHTML = '<span style="font-size:0.8rem; color:#ccc; padding:5px;">📭 기록 없음</span>';
@@ -2517,7 +2243,6 @@ window.renderLightningHistoryButtons = function() {
     }).join('');
 };
 
-// 5. 과거 기록 불러오기 (버튼 클릭 시)
 window.loadLightningHistory = function(date) {
     const historyData = window.lightningHistoryCache ? window.lightningHistoryCache[date] : null;
     
@@ -2527,33 +2252,23 @@ window.loadLightningHistory = function(date) {
 
     if(!confirm(`📂 [${date}] 기록을 불러오시겠습니까?\n현재 화면의 점수는 사라지고 과거 기록으로 바뀝니다.`)) return;
 
-    // 데이터 교체
     gameTeams = historyData.gameTeams;
     if(historyData.settings) settings = historyData.settings;
 
     alert(`✅ ${date} 기록 복원 완료!`);
 
-    // 화면 새로고침 (통계 탭 내용 갱신)
     if(typeof window.renderAllStats === 'function') window.renderAllStats();
     
-    // 통계 탭으로 강제 이동
     const tabBtns = document.querySelectorAll('.tab-btn');
     if(tabBtns[5]) window.showPanel('statsPanel', tabBtns[5]); 
 };
-/* ==========================================================================
-   🚀 [입력 최적화 패치] 점수 입력 시 끊김 및 데이터 증발 방지 시스템
-   ========================================================================== */
 
-// 1. 입력 상태를 관리하는 전역 변수 (방어막)
 window.isScoreEditing = false;
 
-// 2. 기존의 멍청한 감시자를 끄고, 똑똑한 감시자로 교체합니다.
-// (기존 리스너가 중복 실행되지 않도록 먼저 연결을 끊습니다)
 if (db) {
     db.ref('bowling_v14').off(); 
 
-    // ✅ [수리 완료] 통합 데이터 감시자
-db.ref('bowling_v14').on('value', sn => {
+    db.ref('bowling_v14').on('value', sn => {
     const val = sn.val() || {};
     
     members = val.members ? Object.keys(val.members).map(k => ({ ...val.members[k], key: k })) : [];
@@ -2561,7 +2276,6 @@ db.ref('bowling_v14').on('value', sn => {
     records = val.records ? Object.keys(val.records).map(k => ({ ...val.records[k], key: k })) : [];
     events = val.events || {};
 
-    // [핵심] 입력 중이 아닐 때만 팀 데이터를 가져와서 점수 증발을 막습니다.
     if (!window.isScoreEditing) {
         gameTeams = val.gameTeams || {};
     }
@@ -2571,20 +2285,13 @@ db.ref('bowling_v14').on('value', sn => {
     if(val.laneSettings) laneSettings = val.laneSettings; 
     if(val.selectedBlocks) selectedBlocks = val.selectedBlocks; 
 
-    if (!window.initialLoadDone) {
-        window.currentTargetGame = 1; 
-        window.initialLoadDone = true; 
-    }
-
     if (typeof window.updateUI === 'function' && !window.isScoreEditing) {
         window.updateUI();
     }
 });
 }
 
-// 3. 입력창 그리기 함수 업그레이드 (포커스 감지 기능 추가)
 window.renderInputs = function() {
-    // 1. 입력 중일 때는 화면을 새로 그리지 않음 (자판 유지)
     if (window.isScoreEditing) return;
 
     const tabs = document.getElementById('inputTabs');
@@ -2598,7 +2305,6 @@ window.renderInputs = function() {
     const area = document.getElementById('inputGridArea');
     let gData = gameTeams[currentInputGame] || [];
     
-    // 팀 필터링 (특정 팀만 보기 선택 시)
     if(currentInputTeam) gData = gData.filter(t => t.teamNo == currentInputTeam);
 
     if (!gData || gData.length === 0) {
@@ -2634,28 +2340,13 @@ window.renderInputs = function() {
     area.innerHTML = h;
 };
 
-// 4. [보너스] 점수 업데이트 시 불필요한 연산 최소화
-window.updateScore = function(n, v) { 
-    // 로컬 데이터만 빠르게 바꿉니다. (서버 전송 X -> onblur에서 저장)
-    const teams = gameTeams[currentInputGame] || [];
-    for(let t of teams) {
-        for(let m of t.members) {
-            if(m.name === n) {
-                m.score = parseInt(v) || 0;
-                return; // 찾았으면 즉시 종료 (속도 향상)
-            }
-        }
-    }
-};
 window.regularHistoryCache = null;
 
-// 실시간 감시자
 db.ref('bowling_v14/regular_history').on('value', sn => {
     window.regularHistoryCache = sn.val() || {};
     if(typeof window.renderRegularHistoryButtons === 'function') window.renderRegularHistoryButtons();
 });
 
-// 정모 히스토리 버튼 그리기
 window.renderRegularHistoryButtons = function() {
     const btnArea = document.getElementById('regularDateButtons');
     if(!btnArea || !window.regularHistoryCache) return;
@@ -2677,7 +2368,6 @@ window.renderRegularHistoryButtons = function() {
     }).join('');
 };
 
-// 정모 히스토리 불러오기
 window.loadRegularHistory = function(date) {
     const historyData = window.regularHistoryCache ? window.regularHistoryCache[date] : null;
     if(!historyData || !historyData.gameTeams) return alert("⚠️ 데이터를 찾을 수 없습니다.");
@@ -2689,11 +2379,7 @@ window.loadRegularHistory = function(date) {
     alert(`✅ ${date} 정기모임 기록 복원 완료!`);
     window.renderAllStats();
 };
-/* ===============================================================
-   [누락된 부품 추가] 정기모임 히스토리 저장 및 화면 표시 기능
-   =============================================================== */
 
-// 1. [저장] 정모 점수 저장 시 '히스토리'도 함께 백업하는 최신 버전
 window.finalizeToRecords = function() {
     if(!confirm("오늘의 모든 게임 점수를 개인 장부에 영구 저장하고,\n오늘의 팀 구성(정모 히스토리)도 함께 보관할까요?")) return;
 
@@ -2705,7 +2391,6 @@ window.finalizeToRecords = function() {
     let saveCount = 0;
     let memberScores = {};
 
-    // 1~4G(혹은 6G) 점수 취합
     for (let g = 1; g <= settings.gameCount; g++) {
         const teams = gameTeams[g] || [];
         teams.forEach(t => {
@@ -2717,7 +2402,6 @@ window.finalizeToRecords = function() {
         });
     }
 
-    // 장부 기록 생성
     Object.keys(memberScores).forEach(name => {
         const scs = memberScores[name];
         if (scs.some(s => s > 0)) {
@@ -2731,7 +2415,6 @@ window.finalizeToRecords = function() {
 
     if (saveCount === 0) return alert("저장할 점수 데이터가 없습니다.");
 
-    // 🎯 [핵심] 정기모임 스냅샷 저장 (이 부분이 있어야 과거 기록을 볼 수 있습니다!)
     updates[`bowling_v14/regular_history/${today}`] = {
         date: today,
         gameTeams: gameTeams,
@@ -2744,7 +2427,6 @@ window.finalizeToRecords = function() {
     }).catch(err => alert("저장 실패: " + err));
 };
 
-// 2. [화면] 통계 페이지에 '정모 기록(빨강)'과 '번개 기록(노랑)' 버튼을 같이 보여주는 최신 버전
 window.renderAllStats = function() {
     if(typeof window.renderHistoricalStats === 'function') window.renderHistoricalStats();
     if(typeof window.renderStatsGameTabs === 'function') window.renderStatsGameTabs();
@@ -2753,10 +2435,9 @@ window.renderAllStats = function() {
     const panel = document.getElementById('statsPanel');
     if(!panel) return;
 
-    // 기존 히스토리 영역 제거 후 새로 생성
     const oldNav = document.getElementById('historyNavContainer');
     if(oldNav) oldNav.remove();
-    const oldLight = document.getElementById('lightningHistoryNav'); // 구형 잔재 제거
+    const oldLight = document.getElementById('lightningHistoryNav'); 
     if(oldLight) oldLight.remove();
 
     const navDiv = document.createElement('div');
@@ -2779,11 +2460,9 @@ window.renderAllStats = function() {
     `;
     panel.prepend(navDiv);
 
-    // 버튼 그리기 실행
     if(typeof window.renderRegularHistoryButtons === 'function') window.renderRegularHistoryButtons();
     if(typeof window.renderLightningHistoryButtons === 'function') window.renderLightningHistoryButtons();
 
-    // 하단 저장 버튼 구역 (관리자 전용)
     const totalRankArea = document.getElementById('todayTotalRankTable');
     if(totalRankArea && isAdmin) {
         const oldFinalize = document.getElementById('finalizeBtnArea');
@@ -2794,7 +2473,6 @@ window.renderAllStats = function() {
         const btnDiv = document.createElement('div');
         btnDiv.style.margin = "30px 0 10px 0";
         
-        // 현재 모드에 따라 버튼 다르게 표시
         if (settings.mode === 'regular') {
             btnDiv.id = 'finalizeBtnArea';
             btnDiv.innerHTML = `
@@ -2813,14 +2491,13 @@ window.renderAllStats = function() {
         totalRankArea.parentNode.insertBefore(btnDiv, totalRankArea);
     }
 };
-// 1. [신규] 조용히 저장하는 함수 (입력창 이동할 때 씀)
+
 window.silentSave = function() {
-    // 알림창(Alert) 없이 데이터만 조용히 서버에 보냅니다.
     db.ref('bowling_v14/gameTeams').set(gameTeams).then(() => {
         console.log("자동 저장 완료 (조용함)");
     });
 };
-// 카톡용 링크 복사 함수
+
 window.copyKakaoLink = function(id, date, mode) {
     const modeK = mode === 'regular' ? '⚖️정기모임' : '⚡번개모임';
     const jumpUrl = `https://beumjookim.github.io/ilsanacebc/index.html?eventId=${id}`;
@@ -2831,7 +2508,6 @@ window.copyKakaoLink = function(id, date, mode) {
     });
 };
 
-// 특정 이벤트로 자동 스크롤 점프 함수
 window.jumpToSpecificEvent = function() {
     const targetId = sessionStorage.getItem('jumpToEvent');
     if (!targetId) return;
@@ -2840,15 +2516,13 @@ window.jumpToSpecificEvent = function() {
         const element = document.getElementById('event_' + targetId);
         if (element) {
             element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            element.style.border = "3px solid #fcc419"; // 반짝 강조
+            element.style.border = "3px solid #fcc419"; 
             setTimeout(() => { element.style.border = "none"; }, 3000);
-            sessionStorage.removeItem('jumpToEvent'); // 점프 후 기억 삭제
+            sessionStorage.removeItem('jumpToEvent'); 
         }
     }, 1000);
 };
-// --- 여기부터 파일 끝까지 복사해서 붙여넣으세요 ---
 
-  // 1. 카카오 열쇠(키) 꽂기 
   try {
     if (typeof Kakao !== 'undefined' && !Kakao.isInitialized()) {
       Kakao.init('fa7a8ba02d5835b0aa4183eac217cb7a'); 
@@ -2858,12 +2532,9 @@ window.jumpToSpecificEvent = function() {
     console.log("초기화 체크 중");
   }
 
-  
-// 🔍 이 부분을 복사해서 기존 공지 관련 함수 자리에 덮어쓰세요
-
 let currentNoticeType = 'app'; 
 
-function openNoticePanel(type) {
+window.openNoticePanel = function(type) {
     currentNoticeType = type;
     const panel = document.getElementById('admin-notice-panel');
     const titleInput = document.getElementById('noticeTitle');
@@ -2874,65 +2545,54 @@ function openNoticePanel(type) {
 
     if (type === 'app') {
         titleInput.value = "🎳 [참석 신청] 오늘 모임 있습니다!";
-        imgInput.value = "https://beumjookim.github.io/ilsanacebc/ace.png"; // 에이스 로고
+        imgInput.value = "https://beumjookim.github.io/ilsanacebc/ace.png"; 
         linkInput.value = "https://beumjookim.github.io/ilsanacebc/";
     } else {
         titleInput.value = "☕ [카페 공지] 새로운 소식을 확인하세요!";
-        
-        // 🚨 관리자님이 말씀하신 그 '단체 사진' 주소로 고정!
         imgInput.value = "https://beumjookim.github.io/ilsanacebc/notice_image.png"; 
-        
-        linkInput.value = ""; // 카페 글 주소는 직접 붙여넣으세요!
+        linkInput.value = ""; 
         linkInput.placeholder = "여기에 카페 글 주소를 붙여넣으세요";
     }
 }
 
-function sendNotice() {
+window.sendNotice = function() {
     const title = document.getElementById('noticeTitle').value || '일산 에이스 공지';
     const desc = document.getElementById('noticeDesc').value || '상세 내용을 확인하세요.';
-    
-    // 🚨 [중요] 사진 주소를 변수에 담습니다. 
-    // 관리자님이 말씀하신 그 '단체 사진'의 절대 경로입니다.
-    const acePhotoUrl = "https://beumjookim.github.io/ilsanacebc/notice_image.png";
-    
+    const img = "https://beumjookim.github.io/ilsanacebc/notice_image.png";
     let link = document.getElementById('noticeLink').value.trim();
 
-    // 주소 보정 (네이버로 정확히 보내기)
-    if (link && !link.startsWith('http')) {
-        link = 'https://' + link;
+    let finalLink = "https://beumjookim.github.io/ilsanacebc/index.html";
+    if (link) {
+        if (!link.startsWith('http')) link = 'https://' + link;
+        finalLink += "?target=" + encodeURIComponent(link);
     }
 
     try {
-        if (!Kakao.isInitialized()) Kakao.init('fa7a8ba02d5835b0aa4183eac217cb7a');
+        if (typeof Kakao !== 'undefined' && !Kakao.isInitialized()) {
+            Kakao.init('fa7a8ba02d5835b0aa4183eac217cb7a');
+        }
 
         Kakao.Share.sendDefault({
             objectType: 'feed',
             content: {
                 title: title,
                 description: desc,
-                imageUrl: acePhotoUrl, // 👈 우리 서버 사진을 직접 꽂아줍니다.
-                link: { 
-                    mobileWebUrl: link, 
-                    webUrl: link 
-                }
+                imageUrl: img,
+                link: { mobileWebUrl: finalLink, webUrl: finalLink }
             },
             buttons: [{ 
                 title: (currentNoticeType === 'app' ? '참석 신청하기' : '게시글 바로가기'), 
-                link: { 
-                    mobileWebUrl: link, 
-                    webUrl: link 
-                }
+                link: { mobileWebUrl: finalLink, webUrl: finalLink } 
             }]
         });
-        
         document.getElementById('admin-notice-panel').style.display = 'none';
-        alert("✅ 사진이 포함된 공지가 발송되었습니다!");
+        alert("✅ 공지가 발송되었습니다!");
     } catch (e) {
-        alert("전송 실패: " + e.message);
+        alert("카톡 전송 실패: " + e.message);
     }
-}
-// ⚡ 이 코드가 있어야 '등록' 버튼이 작동합니다!
-function addBangaeMember() {
+};
+
+window.addBangaeMember = function() {
     var nameInput = document.getElementById('inputName');
     var name = nameInput.value.trim();
 
@@ -2945,7 +2605,6 @@ function addBangaeMember() {
     var li = document.createElement('li');
     li.style = "padding: 8px 0; border-bottom: 1px solid #eee; display: flex; align-items: center;";
 
-    // ✅ 이름 옆에 번개장 선택 버튼(radio)과 삭제 버튼(❌)을 함께 만듭니다.
     li.innerHTML = `
         <label style="flex:1; display:flex; align-items:center; cursor:pointer;">
             <input type="radio" name="leader" value="${name}" style="margin-right:10px;">
@@ -2955,11 +2614,13 @@ function addBangaeMember() {
     `;
 
     list.appendChild(li);
-    nameInput.value = ''; // 입력창 초기화
+    nameInput.value = ''; 
     nameInput.focus();
 }
 </script> 
+
 <div id="admin-notice-panel" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width: 90%; max-width: 400px; background:#fff; z-index:10000; border:3px solid #FFEB33; padding:20px; border-radius:15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+    
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:10px;">
         <h4 style="margin:0; color:#333;">📢 공지 발송 설정</h4>
         <button onclick="document.getElementById('admin-notice-panel').style.display='none'" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
@@ -2977,6 +2638,8 @@ function addBangaeMember() {
         
         <button onclick="sendNotice()" style="width:100%; background:#FFEB33; color:#3C1E1E; border:none; padding:15px; border-radius:10px; font-weight:bold; cursor:pointer; margin-top:5px;">🚀 카톡 공지 보내기</button>
     </div>
-</div>
+
+</div> 
+
 </body>
 </html>
