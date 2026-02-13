@@ -2688,23 +2688,32 @@ window.openNoticePanel = function(type) {
 }
 
 // 4. 공지 발송 (스마트 주소 적용 + 404 원천 봉쇄)
+// 4. 공지 발송 (유형에 따라 사진 자동 선택 + 404 방지)
 window.sendNotice = function() {
     const title = document.getElementById('noticeTitle').value || '일산 에이스 공지';
     const desc = document.getElementById('noticeDesc').value || '상세 내용을 확인하세요.';
     
-    // 사진: 캐시 방지를 위해 시간값 추가
-    const img = "https://beumjookim.github.io/ilsanacebc/notice_image.png?v=" + new Date().getTime();
+    // 🚨 [핵심 수정] 공지 유형에 따라 사진을 다르게 설정합니다.
+    let photoUrl = "";
+    if (currentNoticeType === 'app') {
+        // 앱 참석 공지일 때는 우리 팀 로고(ace.png) 사용
+        photoUrl = "https://beumjookim.github.io/ilsanacebc/ace.png";
+    } else {
+        // 카페 공지일 때는 단체 사진(notice_image.png) 사용
+        photoUrl = "https://beumjookim.github.io/ilsanacebc/notice_image.png";
+    }
+
+    // 캐시 방지를 위해 시간값 추가 (사진이 즉시 바뀌어 보이게 함)
+    const img = photoUrl + "?v=" + new Date().getTime();
     
     let link = document.getElementById('noticeLink').value.trim();
 
-    // 🚨 [핵심 수정] 주소를 손으로 쓰지 않고, 현재 접속된 주소를 자동으로 가져옵니다.
-    // 이렇게 하면 오타나 경로 문제로 인한 404가 절대 날 수 없습니다.
-    let currentUrl = window.location.href.split('?')[0]; // 뒤에 찌꺼기 떼고 순수 주소만
+    // 주소 자동 감지
+    let currentUrl = window.location.href.split('?')[0]; 
     let finalLink = currentUrl;
     
     if (link) {
         if (!link.startsWith('http')) link = 'https://' + link;
-        // 네이버 주소를 포장해서 붙임
         finalLink += "?target=" + encodeURIComponent(link);
     }
 
@@ -2718,18 +2727,12 @@ window.sendNotice = function() {
             content: {
                 title: title,
                 description: desc,
-                imageUrl: img,
-                link: { 
-                    mobileWebUrl: finalLink, 
-                    webUrl: finalLink 
-                }
+                imageUrl: img, // 위에서 결정된 사진이 들어갑니다
+                link: { mobileWebUrl: finalLink, webUrl: finalLink }
             },
             buttons: [{ 
                 title: (currentNoticeType === 'app' ? '참석 신청하기' : '게시글 바로가기'), 
-                link: { 
-                    mobileWebUrl: finalLink, 
-                    webUrl: finalLink 
-                }
+                link: { mobileWebUrl: finalLink, webUrl: finalLink } 
             }]
         });
         document.getElementById('admin-notice-panel').style.display = 'none';
