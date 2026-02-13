@@ -679,7 +679,133 @@ window.addEventListener('load', function() {
         }
     } catch (e) { console.log("카카오 체크 중"); }
 });
+// 🛠️ [수리 완료] 회원 목록 그리기 함수 (강제 적용)
+window.renderMembers = function() { 
+    const area = document.getElementById('memberListArea'); 
+    if(!area) return; 
 
+    // 데이터가 아직 안 왔으면 로딩 표시
+    if(!members || members.length === 0) {
+        area.innerHTML = '<div style="padding:20px; text-align:center; color:#999;">회원 데이터를 불러오는 중...<br>(데이터가 없다면 신규 등록해주세요)</div>';
+        return;
+    }
+
+    // 이름순 정렬 후 목록 생성
+    area.innerHTML = members.sort((a,b)=>a.name.localeCompare(b.name)).map(m => `
+        <div class="member-row" style="padding: 15px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; background:#fff;">
+            <div style="display:flex; flex-direction:column;">
+                <b style="font-size:1.2rem; color:#333;">${m.name}</b>
+                <span style="font-size:0.9rem; color:#666;">
+                    ${m.gender || '남'} / <span style="color:var(--purple); font-weight:bold;">H:${m.handicap || 0}</span>
+                </span>
+            </div>
+            <div style="display:flex; gap:8px;">
+                <button class="btn-sm" style="background:var(--accent); color:white; border:none; padding:8px 12px; border-radius:5px;" 
+                    onclick="window.updateMember('${m.key}', '${m.name}', ${m.handicap}, '${m.gender||'남'}')">수정</button>
+                
+                <button class="btn-sm" style="background:var(--warning); color:white; border:none; padding:8px 12px; border-radius:5px;" 
+                    onclick="window.updatePw('${m.key}', '${m.name}', '${m.pw||'1234'}')">비번</button>
+                
+                <button class="btn-sm" style="background:var(--danger); color:white; border:none; padding:8px 12px; border-radius:5px;" 
+                    onclick="window.deleteMember('${m.key}', '${m.name}')">삭제</button>
+            </div>
+        </div>
+    `).join(''); 
+};
+// 🛠️ [수리 완료] 배정 엔진 (인원 설정 없으면 자동 4인 기준 고스트 생성)
+window.runAssignment = function() {
+    try {
+        console.log("🚀 [보정된 배정 엔진] 가동...");
+        let targetLanes = [];
+        let totalCapacity = 0;
+
+        // 1. 레인 설정 읽기 (인원 설정 안 했으면 기본 4명으로 강제 설정!)
+        for (let l = 1; l <= 20; l++) {
+            let cnt = parseInt(laneSettings['cnt_' + l]) || 0;
+            let team = parseInt(laneSettings['team_' + l]) || 0;
+            
+            if (team > 0) {
+                // 🚨 인원(cnt)이 0이면 강제로 4명으로 설정 (고스트 생성을 위해)
+                if (cnt === 0) cnt = 4; 
+                
+                targetLanes.push({ lane: l, cap: cnt, teamNo: team });
+                totalCapacity += cnt;
+            }
+        }
+
+        if (targetLanes.length === 0) return alert("❌ [2. 조편성] 탭 아래쪽의 '팀 번호'를 먼저 입력해주세요.");
+
+        // 2. 명단 준비
+        const rankingList = attendees
+            .filter(n => n && !n.includes("고스트"))
+            .map(name => ({
+                name: name.trim(),
+                avg: (typeof window.getWeightedStats === 'function') ? window.getWeightedStats(name).weightedAvg : 0
+            }));
+
+        if (settings.assignMethod === 'random') rankingList.sort(() => Math.random() - 0.5); 
+        else rankingList.sort((a, b) => b.avg - a.avg); 
+
+        // 👻 [핵심] 모자란 인원만큼 고스트 투입!
+        while(rankingList.length < totalCapacity) {
+            rankingList.push({ name: "👻고스트", avg: 0, isGhost: true });
+        }
+
+        // 3. 팀 배정 (스네이크/랜덤)
+        const uniqueTeamNos = [...new Set(targetLanes.map(tl => tl.teamNo))].sort((a,b)=>a-b);
+        let finalTeams = uniqueTeamNos.map(tNo => ({ teamNo: tNo, members: [], totalAvg: 0 }));
+
+        // (간소화된 배정 로직)
+        let currentTeamIdx = 0;
+        let direction = 1; 
+        
+        rankingList.forEach(player => {
+            // 들어갈 팀 찾기 (빈 자리가 있는 팀)
+            let allocated = false;
+            // 스네이크 방식으로 순회
+            for(let k=0; k<finalTeams.length*2; k++) { // 무한루프 방지
+                const team = finalTeams[currentTeamIdx];
+                const teamLanes = targetLanes.filter(tl => tl.teamNo === team.teamNo);
+                const teamCap = teamLanes.reduce((sum, tl) => sum + tl.cap, 0);
+                
+                if (team.members.length < teamCap) {
+                    // 레인 배정
+                    const targetLane = teamLanes.find(tl => team.members.filter(m => m.lane === tl.lane).length < tl.cap);
+                    if (targetLane) {
+                        player.lane = targetLane.lane;
+                        team.members.push(player);
+                        team.totalAvg += player.avg;
+                        allocated = true;
+                        break;
+                    }
+                }
+                
+                // 다음 팀으로 이동 (지그재그)
+                currentTeamIdx += direction;
+                if (currentTeamIdx >= finalTeams.length) { currentTeamIdx = finalTeams.length - 1; direction = -1; }
+                if (currentTeamIdx < 0) { currentTeamIdx = 0; direction = 1; }
+            }
+        });
+
+        // 4. 저장 및 이동
+        const maxAvg = Math.max(...finalTeams.map(t => t.totalAvg));
+        finalTeams.forEach(t => t.matchHandy = Math.max(0, Math.round(maxAvg - t.totalAvg)));
+        
+        gameTeams[currentTargetGame] = finalTeams;
+
+        db.ref('bowling_v14').update({
+            [`gameTeams/${currentTargetGame}`]: finalTeams, 
+            'settings/currentTab': 'progressPanel',        
+            'settings/currentRankView': currentTargetGame  
+        }).then(() => {
+            window.showPanel('progressPanel', document.querySelectorAll('.tab-btn')[3]);
+            alert(`✅ ${currentTargetGame}G 배정 완료! (고스트 포함)`);
+        });
+
+    } catch (err) {
+        alert("🚨 배정 오류: " + err.message);
+    }
+};
 // 4. 앱 진입 함수
 window.enterApp = function() {
     const landing = document.getElementById('landingPage');
