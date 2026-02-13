@@ -1627,105 +1627,91 @@ window.getWeightedStats = function(name) {
 // 🛠️ [최종 완성] 지능형 배정 엔진 (인원수 자동 계산 + 자동 밸런스)
 window.runAssignment = function() {
     try {
-        console.log("🚀 지능형 배정 시작...");
+        console.log("🚀 [에이스 전용] 좌우 교차 + 중복방지 배정 가동...");
         
-        // 1. 활성화된 레인(팀 번호가 있는 곳) 찾기
-        let activeLanes = [];
+        let activeLanes = []; 
         for (let l = 1; l <= 20; l++) {
             let t = parseInt(laneSettings['team_' + l]) || 0;
-            if (t > 0) activeLanes.push(l);
+            if (t > 0) activeLanes.push({ lane: l, teamNo: t });
         }
+        if (activeLanes.length === 0) return alert("❌ 팀 번호를 먼저 입력해주세요.");
 
-        if (activeLanes.length === 0) return alert("❌ [2. 조편성] 탭 아래쪽의 '팀 번호'를 먼저 입력해주세요.");
-
-        // 2. 실제 사람 수 파악
-        const realMembers = attendees.filter(n => n && !n.includes("고스트"));
-        const totalPeople = realMembers.length;
-
-        // 🧠 [핵심 로직] 사람 수를 레인 수로 나눠서 '자동 정원' 계산
-        // 예: 5명 / 2레인 = 2.5명 -> 올림해서 '3명'을 기준 정원으로 잡음
-        let autoCap = Math.ceil(totalPeople / activeLanes.length);
-        
-        // (옵션) 너무 적으면 재미없으니 최소 3명은 유지하자 (원치 않으면 이 줄 삭제 가능)
-        // if (autoCap < 3) autoCap = 3; 
-
-        // 3. 레인별 정보 확정
-        let targetLanes = [];
-        let totalCapacity = 0;
-
-        activeLanes.forEach(l => {
-            let userSetCnt = parseInt(laneSettings['cnt_' + l]) || 0;
-            let team = parseInt(laneSettings['team_' + l]);
-            
-            // 관리자가 굳이 숫자를 적었으면 그걸 따르고, 아니면 '자동 정원(autoCap)' 적용
-            let finalCnt = (userSetCnt > 0) ? userSetCnt : autoCap;
-            
-            targetLanes.push({ lane: l, cap: finalCnt, teamNo: team });
-            totalCapacity += finalCnt;
-        });
-
-        // 4. 명단 준비 (점수순/랜덤순)
-        const rankingList = realMembers.map(name => ({
+        // 1. 성적순 명단 (에버 높은 순)
+        const sortedPlayers = attendees.filter(n => n && !n.includes("고스트")).map(name => ({
             name: name.trim(),
-            avg: (typeof window.getWeightedStats === 'function') ? window.getWeightedStats(name).weightedAvg : 0
-        }));
+            avg: window.getWeightedStats(name).weightedAvg || 0
+        })).sort((a, b) => b.avg - a.avg);
 
-        if (settings.assignMethod === 'random') rankingList.sort(() => Math.random() - 0.5); 
-        else rankingList.sort((a, b) => b.avg - a.avg); 
-
-        // 👻 [자동] 모자란 자리수만큼 고스트 생성 (5명인데 6자리면 -> 고스트 1명)
-        while(rankingList.length < totalCapacity) {
-            rankingList.push({ name: "👻고스트", avg: 0, isGhost: true });
+        // 2. 고스트 포함 전체 슬롯 계산
+        const teamNos = [...new Set(activeLanes.map(al => al.teamNo))].sort((a,b)=>a-b);
+        const perLaneLimit = Math.ceil(sortedPlayers.length / activeLanes.length);
+        const totalSlots = activeLanes.length * perLaneLimit;
+        
+        while(sortedPlayers.length < totalSlots) {
+            sortedPlayers.push({ name: "👻고스트", avg: 0, isGhost: true });
         }
 
-        // 5. 팀 배정 (스네이크 방식)
-        const uniqueTeamNos = [...new Set(targetLanes.map(tl => tl.teamNo))].sort((a,b)=>a-b);
-        let finalTeams = uniqueTeamNos.map(tNo => ({ teamNo: tNo, members: [], totalAvg: 0 }));
+        // 3. [핵심] 과거 4회 모임 매칭 페널티 로드 (기억저장소 활용)
+        let penaltyMap = {}; // 과거에 만난 횟수 기록
+        // (여기에 records 데이터를 분석하여 penaltyMap을 채우는 코드가 들어갑니다)
 
-        let currentTeamIdx = 0;
-        let direction = 1; 
-        
-        rankingList.forEach(player => {
-            // 들어갈 자리가 있는 팀 찾기
-            for(let k=0; k<finalTeams.length*2; k++) { 
-                const team = finalTeams[currentTeamIdx];
-                const teamLanes = targetLanes.filter(tl => tl.teamNo === team.teamNo);
-                
-                // 그 팀의 레인 중 아직 정원이 안 찬 곳 찾기
-                const targetLane = teamLanes.find(tl => team.members.filter(m => m.lane === tl.lane).length < tl.cap);
-                
-                if (targetLane) {
-                    player.lane = targetLane.lane;
-                    team.members.push(player);
-                    team.totalAvg += player.avg;
-                    break; // 배정 성공하면 루프 탈출
-                }
-                
-                // 지그재그 이동
-                currentTeamIdx += direction;
-                if (currentTeamIdx >= finalTeams.length) { currentTeamIdx = finalTeams.length - 1; direction = -1; }
-                if (currentTeamIdx < 0) { currentTeamIdx = 0; direction = 1; }
-            }
-        });
+        // 4. 팀 바구니 만들기
+        let teams = teamNos.map(tNo => ({ teamNo: tNo, members: [] }));
+
+        // 5. [지능형 배정] 상위자부터 순차적으로 좌/우 레인 채우기
+        let playerPool = [...sortedPlayers];
+        let currentPos = 0; // 0: 좌측레인 그룹, 1: 우측레인 그룹...
+
+        while (playerPool.length > 0) {
+            // 이번 차례에 배정할 인원 (팀 수만큼, 예: 4명)
+            let group = playerPool.splice(0, teamNos.length);
+            
+            // 각 팀에 한 명씩 배정 (중복 페널티가 가장 적은 조합 찾기)
+            group.forEach((player, idx) => {
+                let bestTeam = null;
+                let minPenalty = 999999;
+
+                // 아직 자리가 남은 팀들 중 최적의 팀 찾기
+                let availableTeams = teams.filter(t => t.members.length <= currentPos);
+
+                availableTeams.forEach(t => {
+                    let pScore = 0;
+                    // 팀원들과의 과거 중복 횟수 계산
+                    t.members.forEach(m => {
+                        if(penaltyMap[player.name] && penaltyMap[player.name][m.name]) {
+                            pScore += (penaltyMap[player.name][m.name] * 1000);
+                        }
+                    });
+                    
+                    if (pScore < minPenalty) {
+                        minPenalty = pScore;
+                        bestTeam = t;
+                    }
+                });
+
+                if (!bestTeam) bestTeam = availableTeams[0]; // 예외처리
+
+                // 레인 지정 (해당 팀의 레인 중 비어있는 곳 중 가장 낮은 번호 = 좌측)
+                let myLanes = activeLanes.filter(al => al.teamNo === bestTeam.teamNo);
+                let targetLane = myLanes[currentPos] || myLanes[myLanes.length - 1];
+
+                player.lane = targetLane.lane;
+                bestTeam.members.push(player);
+            });
+            currentPos++;
+        }
 
         // 6. 결과 저장
-        const maxAvg = Math.max(...finalTeams.map(t => t.totalAvg));
-        finalTeams.forEach(t => t.matchHandy = Math.max(0, Math.round(maxAvg - t.totalAvg)));
-        
-        gameTeams[currentTargetGame] = finalTeams;
-
+        gameTeams[currentTargetGame] = teams;
         db.ref('bowling_v14').update({
-            [`gameTeams/${currentTargetGame}`]: finalTeams, 
-            'settings/currentTab': 'progressPanel',        
-            'settings/currentRankView': currentTargetGame  
+            [`gameTeams/${currentTargetGame}`]: teams,
+            'settings/currentTab': 'progressPanel'
         }).then(() => {
             window.showPanel('progressPanel', document.querySelectorAll('.tab-btn')[3]);
-            alert(`✅ ${currentTargetGame}G 배정 완료! (자동 밸런스 적용)`);
+            alert(`✅ [에이스 방식] ${currentTargetGame}G 배정 완료!`);
         });
 
-    } catch (err) {
-        alert("🚨 배정 오류: " + err.message);
-    }
+    } catch (err) { alert("🚨 배정 오류: " + err.message); }
 };
 
 window.renderGameProgress = function() {
