@@ -715,91 +715,84 @@ window.renderMembers = function() {
 // 🛠️ [수리 완료] 배정 엔진 (인원 설정 없으면 자동 4인 기준 고스트 생성)
 window.runAssignment = function() {
     try {
-        console.log("🚀 [보정된 배정 엔진] 가동...");
-        let targetLanes = [];
-        let totalCapacity = 0;
-
-        // 1. 레인 설정 읽기 (인원 설정 안 했으면 기본 4명으로 강제 설정!)
+        console.log("🚀 [고스트 보장형] 배정 엔진 가동...");
+        
+        // 1. 활성화된 레인(팀 번호가 입력된 곳) 수집
+        let activeLanes = [];
         for (let l = 1; l <= 20; l++) {
-            let cnt = parseInt(laneSettings['cnt_' + l]) || 0;
-            let team = parseInt(laneSettings['team_' + l]) || 0;
-            
-            if (team > 0) {
-                // 🚨 인원(cnt)이 0이면 강제로 4명으로 설정 (고스트 생성을 위해)
-                if (cnt === 0) cnt = 4; 
-                
-                targetLanes.push({ lane: l, cap: cnt, teamNo: team });
-                totalCapacity += cnt;
-            }
+            let t = parseInt(laneSettings['team_' + l]) || 0;
+            if (t > 0) activeLanes.push({ lane: l, teamNo: t });
         }
 
-        if (targetLanes.length === 0) return alert("❌ [2. 조편성] 탭 아래쪽의 '팀 번호'를 먼저 입력해주세요.");
+        if (activeLanes.length === 0) return alert("❌ 조편성 하단의 '팀 번호'를 입력해주세요.");
 
-        // 2. 명단 준비
-        const rankingList = attendees
-            .filter(n => n && !n.includes("고스트"))
-            .map(name => ({
-                name: name.trim(),
-                avg: (typeof window.getWeightedStats === 'function') ? window.getWeightedStats(name).weightedAvg : 0
-            }));
+        // 2. 실제 참석자 명단 (고스트 제외)
+        const realMembers = attendees.filter(n => n && !n.includes("고스트"));
+        
+        // 🧠 [핵심] 레인당 평균 인원 계산 (무조건 올림)
+        // 예: 5명 / 2레인 = 2.5 -> 3명씩 필요
+        let requiredPerLane = Math.ceil(realMembers.length / activeLanes.length);
+        if (requiredPerLane < 1) requiredPerLane = 1;
 
+        // 3. 총 필요한 자리수 계산 및 고스트 보충
+        let totalSlots = activeLanes.length * requiredPerLane;
+        
+        const rankingList = realMembers.map(name => ({
+            name: name.trim(),
+            avg: (typeof window.getWeightedStats === 'function') ? window.getWeightedStats(name).weightedAvg : 0
+        }));
+
+        // 설정된 방식에 따라 정렬
         if (settings.assignMethod === 'random') rankingList.sort(() => Math.random() - 0.5); 
         else rankingList.sort((a, b) => b.avg - a.avg); 
 
-        // 👻 [핵심] 모자란 인원만큼 고스트 투입!
-        while(rankingList.length < totalCapacity) {
+        // 👻 부족한 만큼 고스트를 명단에 미리 채워넣음
+        while(rankingList.length < totalSlots) {
             rankingList.push({ name: "👻고스트", avg: 0, isGhost: true });
         }
 
-        // 3. 팀 배정 (스네이크/랜덤)
-        const uniqueTeamNos = [...new Set(targetLanes.map(tl => tl.teamNo))].sort((a,b)=>a-b);
+        // 4. 팀별 바구니 만들기
+        const uniqueTeamNos = [...new Set(activeLanes.map(al => al.teamNo))].sort((a,b)=>a-b);
         let finalTeams = uniqueTeamNos.map(tNo => ({ teamNo: tNo, members: [], totalAvg: 0 }));
 
-        // (간소화된 배정 로직)
-        let currentTeamIdx = 0;
-        let direction = 1; 
-        
-        rankingList.forEach(player => {
-            // 들어갈 팀 찾기 (빈 자리가 있는 팀)
-            let allocated = false;
-            // 스네이크 방식으로 순회
-            for(let k=0; k<finalTeams.length*2; k++) { // 무한루프 방지
-                const team = finalTeams[currentTeamIdx];
-                const teamLanes = targetLanes.filter(tl => tl.teamNo === team.teamNo);
-                const teamCap = teamLanes.reduce((sum, tl) => sum + tl.cap, 0);
-                
-                if (team.members.length < teamCap) {
-                    // 레인 배정
-                    const targetLane = teamLanes.find(tl => team.members.filter(m => m.lane === tl.lane).length < tl.cap);
-                    if (targetLane) {
-                        player.lane = targetLane.lane;
-                        team.members.push(player);
-                        team.totalAvg += player.avg;
-                        allocated = true;
-                        break;
-                    }
-                }
-                
-                // 다음 팀으로 이동 (지그재그)
-                currentTeamIdx += direction;
-                if (currentTeamIdx >= finalTeams.length) { currentTeamIdx = finalTeams.length - 1; direction = -1; }
-                if (currentTeamIdx < 0) { currentTeamIdx = 0; direction = 1; }
+        // 5. 스네이크 배정 (지그재그로 공평하게)
+        let teamIdx = 0;
+        let direction = 1;
+
+        rankingList.forEach((player) => {
+            let team = finalTeams[teamIdx];
+            
+            // 해당 팀이 써야 할 레인들 중 빈자리 찾기
+            let myLanes = activeLanes.filter(al => al.teamNo === team.teamNo);
+            let targetLaneObj = myLanes.find(al => 
+                team.members.filter(m => m.lane === al.lane).length < requiredPerLane
+            );
+
+            if (targetLaneObj) {
+                player.lane = targetLaneObj.lane;
+                team.members.push(player);
+                team.totalAvg += player.avg;
             }
+
+            // 다음 팀으로 (스네이크)
+            teamIdx += direction;
+            if (teamIdx >= finalTeams.length) { teamIdx = finalTeams.length - 1; direction = -1; }
+            if (teamIdx < 0) { teamIdx = 0; direction = 1; }
         });
 
-        // 4. 저장 및 이동
+        // 6. 핸디 계산 및 저장
         const maxAvg = Math.max(...finalTeams.map(t => t.totalAvg));
         finalTeams.forEach(t => t.matchHandy = Math.max(0, Math.round(maxAvg - t.totalAvg)));
         
         gameTeams[currentTargetGame] = finalTeams;
 
         db.ref('bowling_v14').update({
-            [`gameTeams/${currentTargetGame}`]: finalTeams, 
-            'settings/currentTab': 'progressPanel',        
-            'settings/currentRankView': currentTargetGame  
+            [`gameTeams/${currentTargetGame}`]: finalTeams,
+            'settings/currentTab': 'progressPanel',
+            'settings/currentRankView': currentTargetGame
         }).then(() => {
             window.showPanel('progressPanel', document.querySelectorAll('.tab-btn')[3]);
-            alert(`✅ ${currentTargetGame}G 배정 완료! (고스트 포함)`);
+            alert(`✅ 배정 완료! (고스트 자동 보정됨)`);
         });
 
     } catch (err) {
