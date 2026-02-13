@@ -2555,15 +2555,24 @@ window.openNoticePanel = function(type) {
     }
 }
 
+// 4. 공지 발송 (스마트 주소 적용 + 404 원천 봉쇄)
 window.sendNotice = function() {
     const title = document.getElementById('noticeTitle').value || '일산 에이스 공지';
     const desc = document.getElementById('noticeDesc').value || '상세 내용을 확인하세요.';
-    const img = "https://beumjookim.github.io/ilsanacebc/notice_image.png";
+    
+    // 사진: 캐시 방지를 위해 시간값 추가
+    const img = "https://beumjookim.github.io/ilsanacebc/notice_image.png?v=" + new Date().getTime();
+    
     let link = document.getElementById('noticeLink').value.trim();
 
-    let finalLink = "https://beumjookim.github.io/ilsanacebc/index.html";
+    // 🚨 [핵심 수정] 주소를 손으로 쓰지 않고, 현재 접속된 주소를 자동으로 가져옵니다.
+    // 이렇게 하면 오타나 경로 문제로 인한 404가 절대 날 수 없습니다.
+    let currentUrl = window.location.href.split('?')[0]; // 뒤에 찌꺼기 떼고 순수 주소만
+    let finalLink = currentUrl;
+    
     if (link) {
         if (!link.startsWith('http')) link = 'https://' + link;
+        // 네이버 주소를 포장해서 붙임
         finalLink += "?target=" + encodeURIComponent(link);
     }
 
@@ -2578,11 +2587,17 @@ window.sendNotice = function() {
                 title: title,
                 description: desc,
                 imageUrl: img,
-                link: { mobileWebUrl: finalLink, webUrl: finalLink }
+                link: { 
+                    mobileWebUrl: finalLink, 
+                    webUrl: finalLink 
+                }
             },
             buttons: [{ 
                 title: (currentNoticeType === 'app' ? '참석 신청하기' : '게시글 바로가기'), 
-                link: { mobileWebUrl: finalLink, webUrl: finalLink } 
+                link: { 
+                    mobileWebUrl: finalLink, 
+                    webUrl: finalLink 
+                }
             }]
         });
         document.getElementById('admin-notice-panel').style.display = 'none';
