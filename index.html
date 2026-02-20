@@ -2659,6 +2659,19 @@ window.addBangaeMember = function() {
     nameInput.value = ''; 
     nameInput.focus();
 }
+// 👑 정모장 임명 저장 함수 (추가)
+window.setJungmoManager = function() {
+    const name = document.getElementById('jungmoJangInput').value.trim();
+    if (!name) return alert("임명할 회원의 이름을 입력해주세요.");
+
+    if (confirm(`👑 [${name}] 님을 정모장으로 임명하시겠습니까?`)) {
+        db.ref('bowling_v14/managers/jungmo').set(name).then(() => {
+            alert(`✅ [${name}] 님이 정모장으로 임명되었습니다!`);
+            document.getElementById('jungmoJangInput').value = ''; // 입력창 비우기
+            window.updateUI(); // 즉시 화면 갱신
+        }).catch(err => alert("🚨 저장 오류: " + err.message));
+    }
+};
 // 📊 [진짜 엔진] 엑셀 파일 선택 시 자동으로 데이터를 분석해서 Firebase에 저장
 document.getElementById('excelInput').addEventListener('change', function(e) {
     const file = e.target.files[0];
