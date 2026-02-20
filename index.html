@@ -2659,6 +2659,78 @@ window.addBangaeMember = function() {
     nameInput.value = ''; 
     nameInput.focus();
 }
+// 📊 [진짜 엔진] 엑셀 파일 선택 시 자동으로 데이터를 분석해서 Firebase에 저장
+document.getElementById('excelInput').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!confirm("⚠️ 엑셀의 데이터를 분석하여 장부에 등록하시겠습니까?\n(기존 데이터와 날짜/이름이 겹치면 엑셀 내용으로 덮어씌워집니다)")) {
+        e.target.value = '';
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
+
+        // 1. 날짜 라인 분석 (첫 번째 줄에서 날짜 추출)
+        const dateRow = rows[0];
+        const dates = [];
+        let currentTempDate = "";
+        for (let i = 3; i < dateRow.length; i++) {
+            if (dateRow[i]) currentTempDate = dateRow[i]; // 날짜가 적힌 칸 기억
+            dates[i] = currentTempDate; // 병합된 칸들도 같은 날짜로 인식
+        }
+
+        // 2. 점수 데이터 분석 (세 번째 줄부터 시작)
+        let updates = {};
+        let count = 0;
+
+        for (let i = 2; i < rows.length; i++) {
+            const row = rows[i];
+            const name = (row[0] || "").toString().trim();
+            if (!name || name === "이름") continue;
+
+            // 각 날짜별로 4게임씩 묶어서 추출
+            for (let j = 3; j < row.length; j += 4) {
+                const targetDate = dates[j];
+                if (!targetDate) continue;
+
+                // 4게임 점수 가져오기 (0점이나 빈칸 제외)
+                const scs = [
+                    parseInt(row[j]) || 0,
+                    parseInt(row[j+1]) || 0,
+                    parseInt(row[j+2]) || 0,
+                    parseInt(row[j+3]) || 0
+                ].filter(s => s > 0);
+
+                if (scs.length > 0) {
+                    const safeKey = `${targetDate}_${name.replace(/[.#$/[\]]/g, "_")}`;
+                    updates[`bowling_v14/records/${safeKey}`] = {
+                        date: targetDate,
+                        name: name,
+                        scs: scs
+                    };
+                    count++;
+                }
+            }
+        }
+
+        // 3. Firebase에 일괄 전송
+        if (Object.keys(updates).length > 0) {
+            db.ref().update(updates).then(() => {
+                alert(`🎉 성공! ${count}개의 게임 기록을 엑셀에서 가져왔습니다.\n앱을 새로고침하여 확인하세요!`);
+                location.reload();
+            }).catch(err => alert("🚨 업로드 오류: " + err.message));
+        } else {
+            alert("❌ 엑셀에서 읽을 수 있는 점수 데이터가 없습니다.");
+        }
+    };
+    reader.readAsArrayBuffer(file);
+});
 </script> 
 
 <div id="admin-notice-panel" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width: 90%; max-width: 400px; background:#fff; z-index:10000; border:3px solid #FFEB33; padding:20px; border-radius:15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
