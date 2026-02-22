@@ -614,39 +614,6 @@ if (jumpTarget) sessionStorage.setItem('jumpToEvent', jumpTarget);
     firebase.initializeApp({ databaseURL: "https://ilsan-ace-bowling-team-default-rtdb.asia-southeast1.firebasedatabase.app" });
     db = firebase.database();
 
-
-// ========================================================
-// 🛠️ 이 덩어리를 통째로 복사해서 에러 나는 위치에 붙여넣으세요
-// ========================================================
-// 1. 설정 및 화면 이동 동기화
-db.ref('bowling_v14/settings').on('value', sn => {
-    const val = sn.val();
-    if (!val || !val.currentTab) return;
-
-    if (val.currentAssignGame) currentTargetGame = val.currentAssignGame;
-    if (val.currentRankView) currentRankView = val.currentRankView;
-    if (val.currentInputGame) currentInputGame = val.currentInputGame;
-
-    if (val.currentInputGame && window.renderInputs) {
-        window.renderInputs();
-    }
-
-    const tabBtns = document.querySelectorAll('.tab-btn');
-    let btnIdx = 0; 
-    if (val.currentTab === 'groupPanel') btnIdx = 1;
-    else if (val.currentTab === 'casinoPanel') btnIdx = 2;
-    else if (val.currentTab === 'progressPanel') btnIdx = 3;
-    else if (val.currentTab === 'inputPanel') btnIdx = 4;
-    else if (val.currentTab === 'statsPanel') btnIdx = 5;
-
-    window.showPanel(val.currentTab, tabBtns[btnIdx]);
-});
-
-// 2. 카지노 실시간 감지
-db.ref('bowling_v14/casino').on('value', () => {
-    if(window.renderCasino) window.renderCasino();
-});   
-
 // 3. 엔터키로 다음 입력칸 이동
 // 3. 엔터키로 다음 입력칸 이동
 document.addEventListener('keydown', function(e) {
@@ -1982,9 +1949,7 @@ window.resetAttendance = function() {
     }
 };
 
-window.uploadExcel = function() {
-    alert("엑셀 일괄 등록 기능은 현재 개발 준비 중입니다.");
-};
+
 
 window.getMyTier = function() {
     const myName = (loggedInUser || "").trim();
@@ -2289,30 +2254,37 @@ window.loadLightningHistory = function(date) {
 
 window.isScoreEditing = false;
 
+// ✅ [수정된 마스터 감시자] 점수 증발 방지 및 화면 동기화 통합
 if (db) {
-    db.ref('bowling_v14').off(); 
+    db.ref('bowling_v14').off(); // 기존에 꼬여있을지 모르는 모든 감시를 일단 해제
 
     db.ref('bowling_v14').on('value', sn => {
-    const val = sn.val() || {};
-    
-    members = val.members ? Object.keys(val.members).map(k => ({ ...val.members[k], key: k })) : [];
-    attendees = val.attendees || [];
-    records = val.records ? Object.keys(val.records).map(k => ({ ...val.records[k], key: k })) : [];
-    events = val.events || {};
+        const val = sn.val() || {};
+        
+        // 1. 기초 데이터 로드
+        members = val.members ? Object.keys(val.members).map(k => ({ ...val.members[k], key: k })) : [];
+        attendees = val.attendees || [];
+        records = val.records ? Object.keys(val.records).map(k => ({ ...val.records[k], key: k })) : [];
+        events = val.events || {};
+        
+        if(val.settings) settings = val.settings;
+        if(val.managers) managers = val.managers; 
+        if(val.laneSettings) laneSettings = val.laneSettings; 
+        if(val.selectedBlocks) selectedBlocks = val.selectedBlocks; 
 
-    if (!window.isScoreEditing) {
-        gameTeams = val.gameTeams || {};
-    }
+        // 2. 🚨 [점수 증발 방지 핵심] 입력 중이거나 입력 탭에 있을 때는 데이터를 덮어쓰지 않음
+        const activePanel = document.querySelector('.panel.active');
+        const isInputMode = activePanel && activePanel.id === 'inputPanel';
 
-    if(val.settings) settings = val.settings;
-    if(val.managers) managers = val.managers; 
-    if(val.laneSettings) laneSettings = val.laneSettings; 
-    if(val.selectedBlocks) selectedBlocks = val.selectedBlocks; 
+        if (!window.isScoreEditing && !isInputMode) {
+            gameTeams = val.gameTeams || {};
+        }
 
-    if (typeof window.updateUI === 'function' && !window.isScoreEditing) {
-        window.updateUI();
-    }
-});
+        // 3. UI 업데이트 (수정 중이 아닐 때만)
+        if (typeof window.updateUI === 'function' && !window.isScoreEditing && !window.isConfigEditing) {
+            window.updateUI();
+        }
+    });
 }
 
 window.renderInputs = function() {
@@ -2355,7 +2327,14 @@ window.renderInputs = function() {
                        ${isG ? 'readonly style="background:#f1f3f5; color:#777;"' : ''}
                        onfocus="window.isScoreEditing=true; if(this.value=='0') this.value='';" 
                        onblur="window.isScoreEditing=false;" 
-                       oninput="if(this.value.length > 3) this.value = this.value.slice(0, 3); window.updateScore('${m.name}', this.value)"
+                       oninput="
+                           // 1. 세 자리까지만 입력 허용
+                           if(this.value.length > 3) this.value = this.value.slice(0, 3);
+                           // 2. 300점이 넘으면 300으로 강제 고정
+                           if(parseInt(this.value) > 300) this.value = 300;
+                           // 3. 점수 업데이트
+                           window.updateScore('${m.name}', this.value)
+                       "
                        style="width:80px; height:45px; font-size:1.5rem; text-align:center; border:2px solid #ccc; border-radius:8px;">
             </div>`;
         });
