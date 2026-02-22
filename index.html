@@ -332,6 +332,7 @@
     <button class="tab-btn" onclick="window.showPanel('progressPanel', this)">3.진행</button>
     <button class="tab-btn" onclick="window.clickInputTab(this)">4.입력</button>
     <button class="tab-btn" onclick="window.showPanel('statsPanel', this)">통계</button>
+    <button class="tab-btn" onclick="window.showPanel('archivePanel', this)" style="background:#e3f2fd; color:#1565c0;">📂 기록보관소</button>
     <button class="tab-btn" onclick="window.showPanel('memberPanel', this)">회원관리</button>
     <button class="tab-btn" id="settingsTabBtn" onclick="window.showPanel('settingsPanel', this)" style="display:none;">⚙️ 설정</button>
 </div>
@@ -2438,34 +2439,6 @@ window.renderAllStats = function() {
     const panel = document.getElementById('statsPanel');
     if(!panel) return;
 
-    const oldNav = document.getElementById('historyNavContainer');
-    if(oldNav) oldNav.remove();
-    const oldLight = document.getElementById('lightningHistoryNav'); 
-    if(oldLight) oldLight.remove();
-
-    const navDiv = document.createElement('div');
-    navDiv.id = 'historyNavContainer';
-    
-    navDiv.style.cssText = "margin-bottom:20px; padding:15px; background:#f8f9fa; border-radius:12px; border:1px solid #eee;";
-    navDiv.innerHTML = `
-        <div style="margin-bottom:12px;">
-            <div style="font-size:0.8rem; color:#e03131; font-weight:bold; margin-bottom:5px;">📅 최근 정기모임 기록</div>
-            <div id="regularDateButtons" style="display:flex; gap:8px; overflow-x:auto; padding-bottom:5px;">
-                 <span style="font-size:0.8rem; color:#ccc;">불러오는 중...</span>
-            </div>
-        </div>
-        <div>
-            <div style="font-size:0.8rem; color:#fab005; font-weight:bold; margin-bottom:5px;">⚡ 최근 번개 기록</div>
-            <div id="lightningDateButtons" style="display:flex; gap:8px; overflow-x:auto; padding-bottom:5px;">
-                 <span style="font-size:0.8rem; color:#ccc;">불러오는 중...</span>
-            </div>
-        </div>
-    `;
-    panel.prepend(navDiv);
-
-    if(typeof window.renderRegularHistoryButtons === 'function') window.renderRegularHistoryButtons();
-    if(typeof window.renderLightningHistoryButtons === 'function') window.renderLightningHistoryButtons();
-
     const totalRankArea = document.getElementById('todayTotalRankTable');
     if(totalRankArea && isAdmin) {
         const oldFinalize = document.getElementById('finalizeBtnArea');
@@ -2723,6 +2696,68 @@ document.getElementById('excelInput').addEventListener('change', function(e) {
     };
     reader.readAsArrayBuffer(file);
 });
+// 📂 [기록보관소] 전용 로직
+window.showArchiveDetail = function(date, type) {
+    const history = (type === 'regular') ? window.regularHistoryCache : window.lightningHistoryCache;
+    const data = history[date];
+    if (!data) return;
+
+    const detailArea = document.getElementById('archiveDetailView');
+    let html = `<h4 style="text-align:center; color:#1565c0;">[${date}] ${type==='regular'?'정기모임':'번개'} 결과</h4>`;
+
+    // 해당 날짜의 게임별 팀 성적 그리기
+    const targetTeams = data.gameTeams;
+    Object.keys(targetTeams).forEach(gameNo => {
+        html += `<div style="background:#f8f9fa; padding:10px; border-radius:8px; margin-bottom:15px; border-left:5px solid #1565c0;">
+                    <b style="font-size:1rem;">${gameNo}G 결과</b>`;
+        
+        targetTeams[gameNo].forEach(t => {
+            let teamSum = (parseInt(t.matchHandy) || 0);
+            t.members.forEach(m => {
+                const mInfo = members.find(x => x.name === m.name) || {handicap: 0};
+                teamSum += (parseInt(m.score) || 0) + (m.name.includes("고스트") ? 0 : (parseInt(mInfo.handicap) || 0));
+            });
+
+            html += `<div style="margin-top:8px; background:#fff; padding:8px; border:1px solid #eee; border-radius:5px;">
+                        <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:0.9rem; margin-bottom:5px;">
+                            <span>Team ${t.teamNo}</span>
+                            <span style="color:#1565c0;">팀 합계: ${teamSum}</span>
+                        </div>
+                        <div style="font-size:0.8rem; color:#666;">
+                            ${t.members.map(m => `${m.name}(${m.score||0})`).join(', ')}
+                        </div>
+                     </div>`;
+        });
+        html += `</div>`;
+    });
+
+    detailArea.innerHTML = html;
+};
+
+// 기록보관소 탭을 열 때 날짜 목록을 뿌려줍니다.
+window.renderArchiveDates = function() {
+    const area = document.getElementById('archiveDateList');
+    if (!area) return;
+
+    const regDates = Object.keys(window.regularHistoryCache || {}).map(d => ({date: d, type: 'regular'}));
+    const lightDates = Object.keys(window.lightningHistoryCache || {}).map(d => ({date: d, type: 'lightning'}));
+    
+    const allDates = [...regDates, ...lightDates].sort((a, b) => b.date.localeCompare(a.date));
+
+    area.innerHTML = allDates.map(item => `
+        <button onclick="window.showArchiveDetail('${item.date}', '${item.type}')" 
+                style="padding:8px 15px; border-radius:20px; border:none; background:${item.type==='regular'?'#e03131':'#fab005'}; color:white; font-weight:bold; white-space:nowrap; cursor:pointer; font-size:0.8rem;">
+            ${item.type==='regular'?'🏆':'⚡'} ${item.date.split('-').slice(1).join('/')}
+        </button>
+    `).join('');
+};
+
+// showPanel 함수에 보관소 탭 감지 추가
+const oldShowPanel = window.showPanel;
+window.showPanel = function(id, btn) {
+    if (id === 'archivePanel') window.renderArchiveDates();
+    oldShowPanel(id, btn);
+};
 </script> 
 
 <div id="admin-notice-panel" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width: 90%; max-width: 400px; background:#fff; z-index:10000; border:3px solid #FFEB33; padding:20px; border-radius:15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
