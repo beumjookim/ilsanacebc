@@ -97,8 +97,18 @@
     box-sizing: border-box; /* 패딩 포함해서 너비 계산 */
 }
 
-        .tab-btn { flex: 1; padding: 12px 0; border: 1px solid #eee; background: #f8f9fa; border-radius: 8px; font-weight: bold; cursor: pointer; min-width: 60px; text-align: center; color: #555; }
-        .tab-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+       .tab-btn { 
+    flex-shrink: 0; /* ★ 버튼이 압축되지 않도록 설정 */
+    padding: 10px 15px; /* 양옆 여백을 충분히 줌 */
+    white-space: nowrap; /* 글자가 줄바꿈되지 않게 함 */
+    border: 1px solid #eee; 
+    background: #f8f9fa; 
+    border-radius: 8px; 
+    font-weight: bold; 
+    cursor: pointer; 
+    text-align: center; 
+    color: #555; 
+}
         
         /* 3. 입력창이 가려지지 않게 하단 여백 확보 */
 .content-area {
@@ -2735,19 +2745,43 @@ window.showArchiveDetail = function(date, type) {
 };
 
 // 기록보관소 탭을 열 때 날짜 목록을 뿌려줍니다.
+// 📂 [업그레이드] 기록보관소 날짜 버튼 생성 엔진
 window.renderArchiveDates = function() {
     const area = document.getElementById('archiveDateList');
     if (!area) return;
 
-    const regDates = Object.keys(window.regularHistoryCache || {}).map(d => ({date: d, type: 'regular'}));
-    const lightDates = Object.keys(window.lightningHistoryCache || {}).map(d => ({date: d, type: 'lightning'}));
+    // 1. 모든 히스토리 데이터 합치기
+    const regHistory = window.regularHistoryCache || {};
+    const lightHistory = window.lightningHistoryCache || {};
+
+    const regDates = Object.keys(regHistory).map(d => ({date: d, type: 'regular'}));
+    const lightDates = Object.keys(lightHistory).map(d => ({date: d, type: 'lightning'}));
     
+    // 2. 최신 날짜순으로 정렬 (2026-02-22 -> 2026-02-21 ...)
     const allDates = [...regDates, ...lightDates].sort((a, b) => b.date.localeCompare(a.date));
 
+    if (allDates.length === 0) {
+        area.innerHTML = '<div style="color:#999; padding:20px; text-align:center; width:100%;">저장된 기록이 없습니다.</div>';
+        return;
+    }
+
+    // 3. 버튼 컨테이너 설정 (가로 스크롤 및 간격 유지)
+    area.style.display = "flex";
+    area.style.gap = "10px";
+    area.style.overflowX = "auto";
+    area.style.padding = "10px 5px";
+    area.style.webkitOverflowScrolling = "touch"; // 아이폰 부드러운 스크롤
+
+    // 4. 날짜 버튼 생성 (전체 날짜 표시 + 압축 방지)
     area.innerHTML = allDates.map(item => `
         <button onclick="window.showArchiveDetail('${item.date}', '${item.type}')" 
-                style="padding:8px 15px; border-radius:20px; border:none; background:${item.type==='regular'?'#e03131':'#fab005'}; color:white; font-weight:bold; white-space:nowrap; cursor:pointer; font-size:0.8rem;">
-            ${item.type==='regular'?'🏆':'⚡'} ${item.date.split('-').slice(1).join('/')}
+                style="padding:12px 20px; border-radius:30px; border:none; 
+                       background:${item.type==='regular'?'#e03131':'#fab005'}; 
+                       color:white; font-weight:bold; white-space:nowrap; 
+                       cursor:pointer; font-size:1rem; flex-shrink:0; 
+                       box-shadow:0 4px 6px rgba(0,0,0,0.1);
+                       transition: transform 0.1s;">
+            ${item.type==='regular'?'🏆':'⚡'} ${item.date}
         </button>
     `).join('');
 };
