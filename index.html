@@ -1754,9 +1754,19 @@ window.filterCurrentStats = function(gender, btn) {
 };
 
 window.deleteEvent = function(id) {
-    if (confirm("⚠️ 이 모임 공지를 삭제할까요?\n신청 명단도 모두 사라집니다.")) {
+    if (confirm("⚠️ 이 모임 공지를 삭제할까요?\n조편성 대기 중인 명단도 함께 초기화됩니다.")) {
+        // 1. 공지 삭제
         db.ref('bowling_v14/events/' + id).remove()
-        .then(() => alert("✅ 삭제되었습니다."))
+        .then(() => {
+            // 2. 현재 진행 중인 명단(attendees)과 번개장 정보도 함께 삭제
+            let updates = {};
+            updates['bowling_v14/attendees'] = [];
+            updates['bowling_v14/managers/lightning'] = null;
+            
+            db.ref().update(updates).then(() => {
+                alert("✅ 공지 및 관련 명단이 모두 삭제되었습니다.");
+            });
+        })
         .catch(err => alert("❌ 삭제 실패: " + err));
     }
 };
@@ -1843,28 +1853,26 @@ window.toggleMode = function() {
 window.resetAssignment = function() {
     const myName = (loggedInUser || "").trim();
     const isBoss = isAdmin || (managers.jungmo === myName) || (managers.lightning === myName);
-    if (!isBoss) {
-        return alert("🚫 초기화 권한이 없습니다.");
-    }
+    if (!isBoss) return alert("🚫 초기화 권한이 없습니다.");
+
     const gIdx = currentTargetGame; 
-    if (confirm(`⚠️ [완전 초기화] 현재 [${gIdx}G]의 팀 배정 결과와\n입력된 '레인/팀 설정'을 모두 삭제하시겠습니까?`)) {
+    if (confirm(`⚠️ [완전 초기화] 현재 [${gIdx}G]의 결과와\n참석자 명단(번개장 선택 포함)을 모두 삭제하시겠습니까?`)) {
         let updates = {};
         updates[`bowling_v14/gameTeams/${gIdx}`] = null;
         updates['bowling_v14/casino'] = null;
         updates['bowling_v14/managers/lightning'] = null;
         updates['bowling_v14/laneSettings'] = null; 
         updates['bowling_v14/selectedBlocks'] = null; 
+        
+        // ✨ [핵심 추가] 참석자 명단(attendees)도 함께 비웁니다!
+        updates['bowling_v14/attendees'] = []; 
         updates['bowling_v14/settings/currentAssignGame'] = 1;
 
         db.ref().update(updates).then(() => {
-            if(gameTeams[gIdx]) delete gameTeams[gIdx];
-            laneSettings = {};
-            selectedBlocks = [];
-            document.querySelectorAll('.zone-btn').forEach(b => b.classList.remove('selected'));
-            alert(`✅ ${gIdx}G 배정 결과와 설정이 깨끗하게 초기화되었습니다.`);
-            if(window.renderCustomLaneConfig) window.renderCustomLaneConfig();
-            if(window.renderAssignGameTabs) window.renderAssignGameTabs();
-            if(window.updateUI) window.updateUI(); 
+            // 로컬 변수도 즉시 비워줍니다 (충돌 방지)
+            attendees = []; 
+            alert(`✅ 모든 데이터가 깨끗하게 초기화되었습니다.`);
+            location.reload(); // 확실한 화면 갱신을 위해 리로드 추천
         });
     }
 };
