@@ -281,6 +281,63 @@
         padding: 8px !important;      /* 여백도 줄임 */
         height: 40px !important;
     }
+    /* 카지노 칩 스타일 */
+.chip-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 15px;
+    margin-top: 10px;
+}
+
+.casino-chip {
+    width: 80px;
+    height: 80px;
+    perspective: 1000px;
+    cursor: pointer;
+    margin: 0 auto;
+}
+
+.chip-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    text-align: center;
+    transition: transform 0.6s;
+    transform-style: preserve-3d;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    border-radius: 50%;
+}
+
+/* 칩을 클릭해서 선택됐을 때(picked) 뒤집히는 효과 */
+.casino-chip.picked .chip-inner {
+    transform: rotateY(180deg);
+}
+
+.chip-front, .chip-back {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    backface-visibility: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    border-radius: 50%;
+    border: 4px dashed rgba(255,255,255,0.3);
+    font-weight: bold;
+    color: white;
+}
+
+/* 등급별 칩 색상 */
+.redChips .chip-front { background: radial-gradient(#ff4d4d, #b30000); }
+.blueChips .chip-front { background: radial-gradient(#4d94ff, #0044cc); }
+.yellowChips .chip-front { background: radial-gradient(#ffd633, #b38f00); }
+
+.chip-back {
+    background: #2c3e50;
+    color: white;
+    transform: rotateY(180deg);
+}
    </style>
 </head>
 <body>
@@ -340,6 +397,9 @@
 <div class="tab-menu" id="mainTabMenu">
     <button class="tab-btn active" onclick="window.showPanel('attendPanel', this)">1.참석</button>
     <button class="tab-btn" onclick="window.showPanel('groupPanel', this)">2.조편성</button>
+    <button class="universal-btn" style="background: #2c3e50;" onclick="window.initCasino()">
+    🎰 카지노 판 새로 짜기 (이중 셔플)
+</button>
     <button class="tab-btn" onclick="window.showPanel('casinoPanel', this)">🎰 카지노</button>
     <button class="tab-btn" onclick="window.showPanel('progressPanel', this)">3.진행</button>
     <button class="tab-btn" onclick="window.clickInputTab(this)">4.입력</button>
@@ -377,6 +437,12 @@
             <h3 id="modeDisplay" style="margin:0; font-size:1.1rem; color:var(--primary);">⚖️ 정기모임 (4게임)</h3>
             <button class="btn-sm" onclick="window.toggleMode()" style="background:var(--dark); color:white;">🔄 모드 전환</button>
         </div>
+        <div style="margin: 15px 0; padding: 12px; background: #fff5f5; border: 1px solid #ffcfcf; border-radius: 10px; display: flex; align-items: center; gap: 10px;">
+    <input type="checkbox" id="modeIndividual" style="width:22px; height:22px; accent-color: var(--accent);">
+    <label for="modeIndividual" style="font-weight: bold; color: var(--accent); cursor: pointer;">
+        ⚡ 번개 개인전 모드 (에버 반영 제외 + 완전 랜덤)
+    </label>
+</div>
 
         <div id="assignGameTabs" class="rank-tabs" style="margin: 15px 0;"></div>
 
@@ -468,6 +534,11 @@
                     </div>
                 </div>
             </div>
+            <div id="casinoArea" style="min-height: 300px; padding: 10px;">
+    <p style="text-align:center; color:#999; padding-top:50px;">
+        관리자가 [카지노 초기화]를 누르면 여기에 칩이 나타납니다.
+    </p>
+</div>
 
             <div id="progressPanel" class="panel">
                 <div class="input-box">
@@ -1157,31 +1228,45 @@ window.changeAssignMethod = function(val) {
 };
 
 window.showPanel = function(id, btn) {
+    // 1. 기존 패널 비활성화 및 선택한 패널 활성화
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-    document.getElementById(id).classList.add('active');
+    const targetPanel = document.getElementById(id);
+    if(targetPanel) targetPanel.classList.add('active');
     
+    // 2. 상단 탭 버튼 활성화 상태 변경
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     if(btn) btn.classList.add('active');
 
+    // 3. 입력 패널이 아닐 경우 선택된 팀 초기화 (기존 로직 유지)
     if(id !== 'inputPanel') currentInputTeam = null;
 
+    // 4. 각 패널별 데이터 렌더링 (기존 로직 유지)
     if(id === 'attendPanel') window.renderAttendanceList();
     if(id === 'progressPanel') window.renderGameProgress();
     if(id === 'statsPanel') window.renderAllStats(); 
     if(id === 'memberPanel') window.renderMembers();
 
+    // 5. 조편성 패널 전용 렌더링 (기존 로직 유지)
     if(id === 'groupPanel') {
         if(typeof window.renderAssignGameTabs === 'function') window.renderAssignGameTabs();
         if(typeof window.renderCustomLaneConfig === 'function') window.renderCustomLaneConfig();
         if(typeof window.renderBungaeJangSelect === 'function') window.renderBungaeJangSelect();
     }
 
+    // 6. ✨ [새로 추가] 카지노 패널 렌더링
+    if(id === 'casinoPanel') {
+        if(typeof window.renderCasino === 'function') window.renderCasino();
+    }
+
+    // 7. 입력 패널 전용 렌더링 (기존 로직 유지)
     if(id === 'inputPanel') {
         if(loggedInUser) {
-            document.getElementById('scoreSection').style.display = 'block';
+            const scoreSec = document.getElementById('scoreSection');
+            if(scoreSec) scoreSec.style.display = 'block';
             window.renderInputs(); 
         } else {
-            document.getElementById('scoreSection').style.display = 'none';
+            const scoreSec = document.getElementById('scoreSection');
+            if(scoreSec) scoreSec.style.display = 'none';
         }
     }
 };
@@ -2990,35 +3075,37 @@ window.renderCasino = function() {
                     💡 에버 등급에 맞는 칩을 클릭하여 레인을 선점하세요!
                 </p>`;
 
-    const renderGroup = (chips, title, colorCode) => {
-        if (chips.length === 0) return '';
-        let groupHtml = `<h3 style="color:${colorCode}; margin-top:20px;">● ${title}</h3><div class="chip-grid">`;
-        chips.forEach(c => {
-            const isPicked = c.pickedBy !== null;
-            const isMyPick = c.pickedBy === myName;
-            
-            // 🛡️ 선택 권한: 내 등급이거나(정기), 전원 빨간칩(번개)일 때만 활성화
-            const canIPick = !isPicked && myInfo && (isIndividual ? true : myInfo.color === c.color);
+    const renderGroup = (chips, title, className) => { // 세 번째 인자 이름을 className으로 변경
+    if (chips.length === 0) return '';
+    
+    // 🎨 글자 색상도 클래스에 맞게 매칭 (선택 사항)
+    const titleColors = { "redChips": "#e74c3c", "blueChips": "#3498db", "yellowChips": "#f1c40f" };
+    const textColor = titleColors[className] || "#333";
 
-            groupHtml += `
-                <div class="casino-chip ${colorCode} ${isPicked ? 'picked' : ''}" 
-                     onclick="${canIPick ? `window.pickCasinoChip('${c.id}', '${c.color}')` : ''}">
-                    <div class="chip-inner">
-                        <div class="chip-front">?</div>
-                        <div class="chip-back">
-                            <span style="font-size:0.8rem;">${c.slot.lane}L</span><br>
-                            <span style="font-size:0.7rem;">${c.pickedBy || ''}</span>
-                        </div>
+    let groupHtml = `<h3 style="color:${textColor}; margin-top:20px;">● ${title}</h3><div class="chip-grid ${className}">`;
+    
+    chips.forEach(c => {
+        const isPicked = c.pickedBy !== null;
+        // ... 생략 ...
+        groupHtml += `
+            <div class="casino-chip ${isPicked ? 'picked' : ''}" 
+                 onclick="...">
+                <div class="chip-inner">
+                    <div class="chip-front">?</div>
+                    <div class="chip-back">
+                        <span style="font-size:0.8rem;">${c.slot.lane}L</span><br>
+                        <span style="font-size:0.7rem;">${c.pickedBy || ''}</span>
                     </div>
-                </div>`;
-        });
-        groupHtml += `</div>`;
-        return groupHtml;
-    };
+                </div>
+            </div>`;
+    });
+    groupHtml += `</div>`;
+    return groupHtml;
+};
 
-    h += renderGroup(casino.redChips, "빨간 칩 (Ace)", "#e74c3c");
-    h += renderGroup(casino.blueChips, "파란 칩 (Pro)", "#3498db");
-    h += renderGroup(casino.yellowChips, "노란 칩 (Senior)", "#f1c40f");
+    h += renderGroup(casino.redChips, "빨간 칩 (Ace)", "redChips"); // 색상코드 대신 클래스명 전달
+h += renderGroup(casino.blueChips, "파란 칩 (Pro)", "blueChips");
+h += renderGroup(casino.yellowChips, "노란 칩 (Senior)", "yellowChips");
     h += `</div>`;
 
     area.innerHTML = h;
