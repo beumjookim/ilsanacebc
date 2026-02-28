@@ -2039,139 +2039,7 @@ window.getMyTier = function() {
     return 'yellow';                           
 };
 
-window.initCasino = function() {
-    const myName = (loggedInUser || "").trim();
-    if(!isAdmin && managers.jungmo !== myName) return alert("🚫 권한이 없습니다.");
-    if(!attendees || attendees.length === 0) return alert("참석자를 먼저 체크해주세요.");
-
-    let teamPools = {}; 
-    let maxTeamSize = 0; 
-
-    selectedBlocks.forEach(z => {
-        const start = (z - 1) * 4 + 3;
-        for(let l = start; l < start + 4; l++) {
-            let count = parseInt(laneSettings['cnt_' + l]) || 0;
-            let teamNum = parseInt(laneSettings['team_' + l]) || 0;
-            if(count > 0 && teamNum > 0) {
-                if(!teamPools[teamNum]) teamPools[teamNum] = [];
-                for(let i = 0; i < count; i++) {
-                    teamPools[teamNum].push(l); 
-                }
-                if(teamPools[teamNum].length > maxTeamSize) maxTeamSize = teamPools[teamNum].length;
-            }
-        }
-    });
-
-    const uniqueTeamNos = Object.keys(teamPools).sort((a,b) => a-b);
-    const T = uniqueTeamNos.length; 
-
-    if(T === 0) return alert("🚩 조편성 하단에 '팀 번호'를 입력해야 합니다!");
-
-    let casinoState = { 
-        settings: { status: 'open', totalSlots: attendees.length }, 
-        red: {}, blue: {}, green: {}, yellow: {} 
-    };
-
-    uniqueTeamNos.forEach(tNo => teamPools[tNo].sort(() => Math.random() - 0.5));
-
-    const tiers = ['red', 'blue', 'green', 'yellow', 'yellow']; 
-
-    for(let round = 0; round < maxTeamSize; round++) {
-        const currentTier = tiers[round] || 'yellow'; 
-        let tierLanes = []; 
-
-        uniqueTeamNos.forEach((tNo) => {
-            if(teamPools[tNo] && teamPools[tNo].length > 0) {
-                tierLanes.push(teamPools[tNo].shift());
-            }
-        });
-
-        tierLanes.sort(() => Math.random() - 0.5);
-
-        tierLanes.forEach((laneNum, idx) => {
-            const nextId = Object.keys(casinoState[currentTier]).length + 1;
-            casinoState[currentTier][nextId] = {
-                status: 'idle',
-                owner: '',
-                lane: laneNum
-            };
-        });
-    }
-
-    db.ref('bowling_v14/casino').set(casinoState).then(() => {
-        alert(`🎰 칩 생성 완료!\n- 참여인원: ${attendees.length}명\n- 5인조 대응 칩 세팅이 완료되었습니다.`);
-    });
-};
-
-window.renderCasino = function() {
-    db.ref('bowling_v14/casino').once('value', sn => {
-        const data = sn.val() || {};
-        ['red', 'blue', 'green', 'yellow'].forEach(tier => {
-            const container = document.getElementById('chips_' + tier);
-            const zone = document.getElementById('zone_' + tier);
-            if (!container) return;
-
-            const chips = data[tier] || {};
-            const chipKeys = Object.keys(chips);
-
-            if (zone) zone.style.display = (chipKeys.length > 0) ? 'block' : 'none';
-            container.innerHTML = ''; 
-
-            chipKeys.forEach(id => {
-                const c = chips[id];
-                const isPicked = c.status === 'picked';
-                
-                const div = document.createElement('div');
-                div.className = `chip ${tier} ${isPicked ? 'selected' : ''}`;
-                div.onclick = () => { if(!isPicked) window.pickChip(tier, id); };
-                
-                div.innerHTML = `
-                    <div class="chip-inner">
-                        <div class="chip-num" style="font-size: 1.3rem; font-weight: 900; color: #333;">
-                            ${isPicked ? c.lane + 'L' : ''} 
-                        </div>
-                        <div class="chip-owner" style="color:var(--danger); font-size:11px; font-weight:bold; margin-top:2px;">
-                            ${isPicked ? c.owner : ''}
-                        </div>
-                    </div>`;
-                container.appendChild(div);
-            });
-        });
-    });
-};
-
-window.pickChip = function(tier, id) {
-    const myTier = window.getMyTier(); 
-    const myName = (loggedInUser || "").trim();
-    
-    if (!myTier) return alert("🚫 명단에 없는 유저입니다. (참석 체크 확인)");
-    
-    if (tier !== myTier) {
-        return alert(`⚖️ 규칙 준수!\n회원님은 오직 [${myTier.toUpperCase()}] 칩만 선택할 수 있습니다.`);
-    }
-
-    db.ref('bowling_v14/casino').once('value', sn => {
-        const data = sn.val() || {};
-        let alreadyPicked = false;
-        ['red', 'blue', 'green', 'yellow'].forEach(t => {
-            if(data[t]) {
-                Object.values(data[t]).forEach(c => { if(c.owner === myName) alreadyPicked = true; });
-            }
-        });
-
-        if(alreadyPicked) return alert("🚫 이미 칩을 선택하셨습니다.");
-
-        const chipRef = db.ref(`bowling_v14/casino/${tier}/${id}`);
-        chipRef.transaction(current => {
-            if(current && current.status === 'idle') {
-                return { ...current, status: 'picked', owner: myName };
-            }
-            return; 
-        }, (err, committed) => {
-            if(!committed) alert("⚠️ 다른 분이 먼저 선택했습니다!");
-        });
-    }); 
-}; 
+ 
 
 window.finishCasino = function() {
     const myName = (loggedInUser || "").trim();
@@ -3049,6 +2917,131 @@ window.getWeightedStats = function(name) {
 
     const avg = gameCount > 0 ? Math.round(totalScore / gameCount) : 0;
     return { weightedAvg: avg, simpleAvg12: avg };
+};
+/* ============================================================
+   🎰 [카지노 엔진] 이중 셔플 및 권한 제어 시스템
+   ============================================================ */
+
+// 1. 카지노 판 초기화 (이중 셔플 핵심)
+window.initCasino = function() {
+    const isIndividual = (settings.mode === 'individual'); // 번개 개인전 모드 확인
+    
+    // 참여자 등급별 분류
+    let redCount = 0, blueCount = 0, yellowCount = 0;
+    attendees.forEach(a => {
+        if (isIndividual) redCount++; // 번개면 전원 빨간칩
+        else {
+            if (a.color === 'red') redCount++;
+            else if (a.color === 'blue') blueCount++;
+            else yellowCount++;
+        }
+    });
+
+    // [셔플 1] 모든 레인 슬롯 생성 및 무작위 뒤섞기
+    let allSlots = [];
+    laneSettings.forEach(ls => {
+        for(let i=0; i<ls.count; i++) {
+            allSlots.push({ lane: ls.lane, teamNo: ls.teamNo });
+        }
+    });
+
+    // Fisher-Yates Shuffle (레인 자리 섞기)
+    for (let i = allSlots.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [allSlots[i], allSlots[j]] = [allSlots[j], allSlots[i]];
+    }
+
+    // [셔플 2] 칩과 레인 슬롯 매칭
+    // 이제 각 등급별 칩은 섞인 레인 슬롯 중 하나를 무작위로 가집니다.
+    const createChips = (count, color) => {
+        return Array.from({length: count}, (_, i) => ({
+            id: `${color}_${i}`,
+            color: color,
+            slot: allSlots.pop(), // 무작위로 섞인 레인 하나 할당
+            pickedBy: null
+        }));
+    };
+
+    const casinoData = {
+        redChips: createChips(redCount, 'red'),
+        blueChips: createChips(blueCount, 'blue'),
+        yellowChips: createChips(yellowCount, 'yellow'),
+        pickedCount: 0,
+        totalCount: redCount + blueCount + yellowCount,
+        status: 'ongoing'
+    };
+
+    db.ref('bowling_v14/casino').set(casinoData).then(() => {
+        alert("🎰 이중 셔플 완료! 어느 칩이 어느 레인일지는 아무도 모릅니다.");
+    });
+};
+
+// 2. 카지노 화면 렌더링 (칩 뒤집기 애니메이션 포함)
+window.renderCasino = function() {
+    const area = document.getElementById('casinoArea');
+    if (!casino || !area) return;
+
+    const myName = (loggedInUser || "").trim();
+    const myInfo = attendees.find(a => a.name === myName);
+    const isIndividual = (settings.mode === 'individual');
+
+    let h = `<div class="casino-container">
+                <p style="text-align:center; color:#666; margin-bottom:20px;">
+                    💡 에버 등급에 맞는 칩을 클릭하여 레인을 선점하세요!
+                </p>`;
+
+    const renderGroup = (chips, title, colorCode) => {
+        if (chips.length === 0) return '';
+        let groupHtml = `<h3 style="color:${colorCode}; margin-top:20px;">● ${title}</h3><div class="chip-grid">`;
+        chips.forEach(c => {
+            const isPicked = c.pickedBy !== null;
+            const isMyPick = c.pickedBy === myName;
+            
+            // 🛡️ 선택 권한: 내 등급이거나(정기), 전원 빨간칩(번개)일 때만 활성화
+            const canIPick = !isPicked && myInfo && (isIndividual ? true : myInfo.color === c.color);
+
+            groupHtml += `
+                <div class="casino-chip ${colorCode} ${isPicked ? 'picked' : ''}" 
+                     onclick="${canIPick ? `window.pickCasinoChip('${c.id}', '${c.color}')` : ''}">
+                    <div class="chip-inner">
+                        <div class="chip-front">?</div>
+                        <div class="chip-back">
+                            <span style="font-size:0.8rem;">${c.slot.lane}L</span><br>
+                            <span style="font-size:0.7rem;">${c.pickedBy || ''}</span>
+                        </div>
+                    </div>
+                </div>`;
+        });
+        groupHtml += `</div>`;
+        return groupHtml;
+    };
+
+    h += renderGroup(casino.redChips, "빨간 칩 (Ace)", "#e74c3c");
+    h += renderGroup(casino.blueChips, "파란 칩 (Pro)", "#3498db");
+    h += renderGroup(casino.yellowChips, "노란 칩 (Senior)", "#f1c40f");
+    h += `</div>`;
+
+    area.innerHTML = h;
+};
+
+// 3. 칩 선택 로직 (실시간 반영)
+window.pickCasinoChip = function(chipId, color) {
+    const myName = (loggedInUser || "").trim();
+    if (!myName) return alert("로그인이 필요합니다.");
+
+    // 이미 칩을 뽑았는지 확인
+    const alreadyPicked = [...casino.redChips, ...casino.blueChips, ...casino.yellowChips]
+                          .some(c => c.pickedBy === myName);
+    if (alreadyPicked) return alert("이미 칩을 뽑으셨습니다!");
+
+    const chipKey = `${color}Chips`;
+    const chipIdx = casino[chipKey].findIndex(c => c.id === chipId);
+
+    if (chipIdx > -1) {
+        // Firebase에 선택 정보 업데이트
+        db.ref(`bowling_v14/casino/${chipKey}/${chipIdx}/pickedBy`).set(myName);
+        db.ref(`bowling_v14/casino/pickedCount`).transaction(count => (count || 0) + 1);
+    }
 };
 </script> 
 
