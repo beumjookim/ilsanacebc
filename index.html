@@ -2272,30 +2272,26 @@ window.isScoreEditing = false;
 if (db) {
     db.ref('bowling_v14').off(); // 기존에 꼬여있을지 모르는 모든 감시를 일단 해제
 
+    // ✅ 실시간 데이터 동기화 마스터 엔진
+if (db) {
     db.ref('bowling_v14').on('value', sn => {
         const val = sn.val() || {};
         
-        // 1. 기초 데이터 로드
         members = val.members ? Object.keys(val.members).map(k => ({ ...val.members[k], key: k })) : [];
         attendees = val.attendees || [];
         records = val.records ? Object.keys(val.records).map(k => ({ ...val.records[k], key: k })) : [];
         events = val.events || {};
         
+        // ✨ [핵심 추가] 카지노 데이터를 전역 변수 'casino'에 저장
+        window.casino = val.casino || null; 
+        
         if(val.settings) settings = val.settings;
         if(val.managers) managers = val.managers; 
-        if(val.laneSettings) laneSettings = val.laneSettings; 
-        if(val.selectedBlocks) selectedBlocks = val.selectedBlocks; 
+        if(val.laneSettings) laneSettings = val.laneSettings || {}; 
+        if(val.selectedBlocks) selectedBlocks = val.selectedBlocks || []; 
 
-        // 2. 🚨 [점수 증발 방지 핵심] 입력 중이거나 입력 탭에 있을 때는 데이터를 덮어쓰지 않음
-        const activePanel = document.querySelector('.panel.active');
-        const isInputMode = activePanel && activePanel.id === 'inputPanel';
-
-        if (!window.isScoreEditing && !isInputMode) {
+        if (!window.isScoreEditing && !window.isConfigEditing) {
             gameTeams = val.gameTeams || {};
-        }
-
-        // 3. UI 업데이트 (수정 중이 아닐 때만)
-        if (typeof window.updateUI === 'function' && !window.isScoreEditing && !window.isConfigEditing) {
             window.updateUI();
         }
     });
@@ -3008,41 +3004,52 @@ window.getWeightedStats = function(name) {
    ============================================================ */
 
 // 1. 카지노 판 초기화 (이중 셔플 핵심)
+/* ============================================================
+   🎰 [카지노 엔진] 수정본 (객체 구조 및 이름 배열 대응)
+   ============================================================ */
 window.initCasino = function() {
-    const isIndividual = (settings.mode === 'individual'); // 번개 개인전 모드 확인
+    const isIndividual = (settings.mode === 'individual'); 
     
-    // 참여자 등급별 분류
-    let redCount = 0, blueCount = 0, yellowCount = 0;
-    attendees.forEach(a => {
-        if (isIndividual) redCount++; // 번개면 전원 빨간칩
+    // 1. 레인 슬롯 생성 (객체 형태인 laneSettings를 올바르게 순회)
+    let allSlots = [];
+    for (let l = 1; l <= 20; l++) {
+        const count = parseInt(laneSettings['cnt_' + l]) || 0;
+        const teamNo = parseInt(laneSettings['team_' + l]) || 0;
+        if (count > 0 && teamNo > 0) {
+            for (let i = 0; i < count; i++) {
+                allSlots.push({ lane: l, teamNo: teamNo });
+            }
+        }
+    }
+
+    if (allSlots.length === 0) return alert("❌ [2. 조편성]에서 레인별 인원(팀 번호 포함)을 먼저 설정해주세요!");
+    if (attendees.length === 0) return alert("❌ 선택된 참석자가 없습니다!");
+
+    // 2. 등급별 인원 분류 (이름 리스트에서 실시간 티어 계산)
+    let redCount = 0, blueCount = 0, greenCount = 0, yellowCount = 0;
+    attendees.forEach(name => {
+        if (isIndividual) { redCount++; } 
         else {
-            if (a.color === 'red') redCount++;
-            else if (a.color === 'blue') blueCount++;
+            const tier = window.calculateTierByName(name); 
+            if (tier === 'red') redCount++;
+            else if (tier === 'blue') blueCount++;
+            else if (tier === 'green') greenCount++;
             else yellowCount++;
         }
     });
 
-    // [셔플 1] 모든 레인 슬롯 생성 및 무작위 뒤섞기
-    let allSlots = [];
-    laneSettings.forEach(ls => {
-        for(let i=0; i<ls.count; i++) {
-            allSlots.push({ lane: ls.lane, teamNo: ls.teamNo });
-        }
-    });
-
-    // Fisher-Yates Shuffle (레인 자리 섞기)
+    // 3. [셔플 1] 레인 자리 무작위 섞기
     for (let i = allSlots.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [allSlots[i], allSlots[j]] = [allSlots[j], allSlots[i]];
     }
 
-    // [셔플 2] 칩과 레인 슬롯 매칭
-    // 이제 각 등급별 칩은 섞인 레인 슬롯 중 하나를 무작위로 가집니다.
+    // 4. [셔플 2] 칩 생성 및 슬롯 매칭
     const createChips = (count, color) => {
         return Array.from({length: count}, (_, i) => ({
             id: `${color}_${i}`,
             color: color,
-            slot: allSlots.pop(), // 무작위로 섞인 레인 하나 할당
+            slot: allSlots.pop() || {lane: '?', teamNo: 0},
             pickedBy: null
         }));
     };
@@ -3050,15 +3057,34 @@ window.initCasino = function() {
     const casinoData = {
         redChips: createChips(redCount, 'red'),
         blueChips: createChips(blueCount, 'blue'),
+        greenChips: createChips(greenCount, 'green'),
         yellowChips: createChips(yellowCount, 'yellow'),
         pickedCount: 0,
-        totalCount: redCount + blueCount + yellowCount,
+        totalCount: attendees.length,
         status: 'ongoing'
     };
 
+    // 5. Firebase 저장
     db.ref('bowling_v14/casino').set(casinoData).then(() => {
-        alert("🎰 이중 셔플 완료! 어느 칩이 어느 레인일지는 아무도 모릅니다.");
+        alert("🎰 이중 셔플 완료! 카지노 탭에서 칩을 선택하세요.");
     });
+};
+
+// 💡 보조 함수: 이름으로 등급(티어)을 실시간 계산
+window.calculateTierByName = function(name) {
+    if (!attendees || attendees.length === 0) return 'yellow';
+    const rankingList = attendees.map(n => {
+        const s = window.getWeightedStats(n);
+        return { name: n, avg: s.weightedAvg || 0 };
+    }).sort((a, b) => b.avg - a.avg);
+    
+    const myRank = rankingList.findIndex(p => p.name === name);
+    const T = Math.ceil(rankingList.length / 4) || 1;
+    
+    if(myRank < T) return 'red';
+    if(myRank < T * 2) return 'blue';
+    if(myRank < T * 3) return 'green';
+    return 'yellow';
 };
 
 // 2. 카지노 화면 렌더링 (칩 뒤집기 애니메이션 포함)
