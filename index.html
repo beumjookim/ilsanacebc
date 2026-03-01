@@ -427,9 +427,6 @@
 <div class="tab-menu" id="mainTabMenu">
     <button class="tab-btn active" onclick="window.showPanel('attendPanel', this)">1.참석</button>
     <button class="tab-btn" onclick="window.showPanel('groupPanel', this)">2.조편성</button>
-    <button class="universal-btn" style="background: #2c3e50;" onclick="window.initCasino()">
-    🎰 카지노 판 새로 짜기 (이중 셔플)
-</button>
     <button class="tab-btn" onclick="window.showPanel('casinoPanel', this)">🎰 카지노</button>
     <button class="tab-btn" onclick="window.showPanel('progressPanel', this)">3.진행</button>
     <button class="tab-btn" onclick="window.clickInputTab(this)">4.입력</button>
@@ -467,13 +464,17 @@
             <h3 id="modeDisplay" style="margin:0; font-size:1.1rem; color:var(--primary);">⚖️ 정기모임 (4게임)</h3>
             <button class="btn-sm" onclick="window.toggleMode()" style="background:var(--dark); color:white;">🔄 모드 전환</button>
         </div>
-        <div style="margin: 15px 0; padding: 12px; background: #fff5f5; border: 1px solid #ffcfcf; border-radius: 10px; display: flex; align-items: center; gap: 10px;">
-    <input type="checkbox" id="modeIndividual" style="width:22px; height:22px; accent-color: var(--accent);">
-    <label for="modeIndividual" style="font-weight: bold; color: var(--accent); cursor: pointer;">
-        ⚡ 번개 개인전 모드 (에버 반영 제외 + 완전 랜덤)
-    </label>
+        
+<div style="margin-top:20px; padding:15px; border-top:2px dashed #eee; text-align:center; background:#fff;">
+    <div style="margin-bottom:12px; font-weight:bold; color:var(--dark);">🎰 카지노 게임 모드 선택</div>
+    
+    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+        <button id="btnTeamMode" class="universal-btn" style="background:var(--accent); flex:1; margin-bottom:0;" onclick="window.setGameMode('team')">👥 팀전 시작</button>
+        <button id="btnSoloMode" class="universal-btn" style="background:#ccc; flex:1; margin-bottom:0;" onclick="window.setGameMode('individual')">⚡ 개인전 시작</button>
+    </div>
+    
+    <button class="universal-btn" style="background:var(--warning); color:#000; font-size:1.1rem; box-shadow: 0 4px 10px rgba(0,0,0,0.1);" onclick="window.initCasinoFromSetup()">🎲 이 모드로 카지노판 깔기</button>
 </div>
-
         <div id="assignGameTabs" class="rank-tabs" style="margin: 15px 0;"></div>
 
         <label style="font-weight:bold; color:var(--warning); display:block; margin-bottom:5px;">1. 구역 선택 (레인 구조)</label>
@@ -508,7 +509,10 @@
             ⚖️ 일반 배정
         </button>
 
-        <button type="button" onclick="window.startCasinoAssignment()" 
+        <button type="button" onclick="window.initCasinoFromSetup()" 
+        style="flex:1; height:38px; background:#e67e22; color:white; border:none; border-radius:6px; font-weight:bold; font-size:0.9rem; cursor:pointer; padding:0; box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+    🎰 카지노 판 깔기
+</button>
                 style="flex:1; height:38px; background:#e67e22; color:white; border:none; border-radius:6px; font-weight:bold; font-size:0.9rem; cursor:pointer; padding:0; box-shadow:0 1px 3px rgba(0,0,0,0.1);">
             🎰 카지노
         </button>
@@ -550,8 +554,7 @@
         </div>
 
         <div id="adminCasinoControls" style="margin-top:40px; border-top:1px solid rgba(255,255,255,0.2); padding-top:20px;">
-            <button class="universal-btn" style="background:#f1c40f; color:#000;" onclick="window.initCasino()">🎲 카지노판 새로 깔기 (칩 생성)</button>
-            <button class="universal-btn" style="background:#e67e22; margin-top:10px;" onclick="window.finishCasino()">👻 고스트 확인 및 배정 종료</button>
+             <button class="universal-btn" style="background:#e67e22; margin-top:10px;" onclick="window.finishCasino()">👻 고스트 확인 및 배정 종료</button>
         </div>
     </div>
 </div>
@@ -1350,27 +1353,6 @@ window.runGeneralAssignment = function() {
     });
 };
 
-window.startCasinoAssignment = function() {
-    if (gameTeams[currentTargetGame]) {
-        return alert(`⚠️ 이미 ${currentTargetGame}G 팀 배정이 완료되었습니다.\n새로 하시려면 [🗑️ 초기화]를 먼저 눌러주세요.`);
-    }
-
-    let teamList = [];
-    for(let k in laneSettings) if(k.startsWith('team_') && laneSettings[k] > 0) teamList.push(laneSettings[k]);
-    
-    if(teamList.length === 0) {
-        return alert("먼저 아래 [3. 레인별 인원 설정] 칸에 팀 번호를 입력해야 카지노 배정을 시작할 수 있습니다!");
-    }
-
-    if(confirm(`${currentTargetGame}G 카지노 배정을 시작할까요?`)) {
-        db.ref('bowling_v14/settings').update({
-            'currentTab': 'casinoPanel', 
-            'currentAssignGame': currentTargetGame 
-        }).then(() => {
-            window.showPanel('casinoPanel', document.querySelectorAll('.tab-btn')[2]);
-        });
-    }
-};
 
 window.renderStatsGameTabs = function() {
     const area = document.getElementById('statsGameTabs');
@@ -3093,10 +3075,9 @@ window.calculateTierByName = function(name) {
     return 'purple'; // 나머지 하위 그룹은 보라색
 };
     
-// 2. 카지노 화면 렌더링 (칩 뒤집기 애니메이션 포함)
+//* 2. 카지노 화면 렌더링 */
 window.renderCasino = function() {
     const area = document.getElementById('casinoArea');
-    // 데이터가 없거나 출력 영역이 없으면 중단
     if (!window.casino || !area) return;
 
     let h = `<div class="casino-welcome-msg">🎰 본인 에버 등급의 칩을 클릭하세요!</div>`;
@@ -3104,13 +3085,11 @@ window.renderCasino = function() {
     const renderGroup = (chips, title, className) => {
         if (!chips || chips.length === 0) return '';
         
-        // 제목 부분 (CSS에서 스타일을 잡았으므로 클래스만 잘 주면 됩니다)
         let html = `<h3>● ${title}</h3>`;
-        html += `<div class="chip-grid ${className}">`; // 인라인 style 제거
+        html += `<div class="chip-grid ${className}">`;
         
         chips.forEach(c => {
-            const isPicked = !!c.pickedBy; // 선택 여부 확인
-            
+            const isPicked = !!c.pickedBy;
             html += `
                 <div class="casino-chip ${isPicked ? 'picked' : ''}" 
                      onclick="if(!${isPicked}) window.pickCasinoChip('${c.id}', '${c.color}')">
@@ -3127,7 +3106,6 @@ window.renderCasino = function() {
         return html;
     };
 
-    // 5가지 등급 순차적으로 렌더링
     h += renderGroup(window.casino.redChips, "빨간 칩 (Ace)", "redChips");
     h += renderGroup(window.casino.blueChips, "파란 칩 (Pro)", "blueChips");
     h += renderGroup(window.casino.greenChips, "초록 칩 (Junior)", "greenChips");
@@ -3137,21 +3115,57 @@ window.renderCasino = function() {
     area.innerHTML = h;
 };
 
-// 3. 칩 선택 로직 (실시간 반영)
+/* 1. 모드 선택 상태 관리 */
+let currentCasinoMode = 'team'; 
+
+window.setGameMode = function(mode) {
+    currentCasinoMode = mode;
+    const teamBtn = document.getElementById('btnTeamMode');
+    const soloBtn = document.getElementById('btnSoloMode');
+    if (mode === 'individual') {
+        soloBtn.style.background = "#e74c3c"; soloBtn.style.color = "#fff";
+        teamBtn.style.background = "#ccc";   teamBtn.style.color = "#555";
+    } else {
+        teamBtn.style.background = "var(--accent)"; teamBtn.style.color = "#fff";
+        soloBtn.style.background = "#ccc";          soloBtn.style.color = "#555";
+    }
+};
+
+/* 2. 조편성 탭에서 호출하는 카지노 생성 함수 */
+window.initCasinoFromSetup = function() {
+    if(!confirm(`${currentCasinoMode === 'individual' ? '[개인전]' : '[팀전]'} 모드로 카지노 판을 깔까요?`)) return;
+    
+    settings.mode = currentCasinoMode; 
+    window.initCasino(); 
+    
+    // 카지노 탭(3번째 버튼)으로 자동 이동
+    const casinoTabBtn = document.querySelectorAll('.tab-btn')[2];
+    window.showPanel('casinoPanel', casinoTabBtn);
+};
+
+/* 3. 칩 선택 로직 (보완 완료) */
 window.pickCasinoChip = function(chipId, color) {
     const myName = (loggedInUser || "").trim();
     if (!myName) return alert("로그인이 필요합니다.");
 
-    // 이미 칩을 뽑았는지 확인
-    const alreadyPicked = [...casino.redChips, ...casino.blueChips, ...casino.yellowChips]
-                          .some(c => c.pickedBy === myName);
+    // ✅ 보완: 5가지 색상의 모든 칩을 합쳐서 중복 선택 확인
+    const allChips = [
+        ...(window.casino.redChips || []),
+        ...(window.casino.blueChips || []),
+        ...(window.casino.greenChips || []),
+        ...(window.casino.yellowChips || []),
+        ...(window.casino.purpleChips || [])
+    ];
+
+    const alreadyPicked = allChips.some(c => c.pickedBy === myName);
+    
     if (alreadyPicked) return alert("이미 칩을 뽑으셨습니다!");
 
     const chipKey = `${color}Chips`;
-    const chipIdx = casino[chipKey].findIndex(c => c.id === chipId);
+    const chipIdx = window.casino[chipKey].findIndex(c => c.id === chipId);
 
     if (chipIdx > -1) {
-        // Firebase에 선택 정보 업데이트
+        // Firebase 업데이트
         db.ref(`bowling_v14/casino/${chipKey}/${chipIdx}/pickedBy`).set(myName);
         db.ref(`bowling_v14/casino/pickedCount`).transaction(count => (count || 0) + 1);
     }
