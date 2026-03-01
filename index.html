@@ -2305,7 +2305,7 @@ if (db) {
         }
     });
 }
-
+}
 window.renderInputs = function() {
     const tabs = document.getElementById('inputTabs');
     const area = document.getElementById('inputGridArea');
@@ -3116,33 +3116,28 @@ window.renderCasino = function() {
                     💡 에버 등급에 맞는 칩을 클릭하여 레인을 선점하세요!
                 </p>`;
 
-    const renderGroup = (chips, title, className) => { // 세 번째 인자 이름을 className으로 변경
-    if (chips.length === 0) return '';
-    
-    // 🎨 글자 색상도 클래스에 맞게 매칭 (선택 사항)
-    const titleColors = { "redChips": "#e74c3c", "blueChips": "#3498db", "yellowChips": "#f1c40f" };
-    const textColor = titleColors[className] || "#333";
-
-    let groupHtml = `<h3 style="color:${textColor}; margin-top:20px;">● ${title}</h3><div class="chip-grid ${className}">`;
-    
-    chips.forEach(c => {
-        const isPicked = c.pickedBy !== null;
-        // ... 생략 ...
-        groupHtml += `
-            <div class="casino-chip ${isPicked ? 'picked' : ''}" 
-                 onclick="...">
-                <div class="chip-inner">
-                    <div class="chip-front">?</div>
-                    <div class="chip-back">
-                        <span style="font-size:0.8rem;">${c.slot.lane}L</span><br>
-                        <span style="font-size:0.7rem;">${c.pickedBy || ''}</span>
+    const renderGroup = (chips, title, className) => {
+        if (!chips || chips.length === 0) return '';
+        
+        let groupHtml = `<h3 style="margin-top:20px;">● ${title}</h3><div class="chip-grid ${className}">`;
+        
+        chips.forEach(c => {
+            const isPicked = c.pickedBy !== null;
+            groupHtml += `
+                <div class="casino-chip ${isPicked ? 'picked' : ''}" 
+                     onclick="if(!${isPicked}) window.pickCasinoChip('${c.id}', '${c.color}')">
+                    <div class="chip-inner">
+                        <div class="chip-front">?</div>
+                        <div class="chip-back">
+                            <span style="font-size:0.8rem;">${c.slot.lane}L</span><br>
+                            <span style="font-size:0.7rem;">${c.pickedBy || ''}</span>
+                        </div>
                     </div>
-                </div>
-            </div>`;
-    });
-    groupHtml += `</div>`;
-    return groupHtml;
-};
+                </div>`;
+        });
+        groupHtml += `</div>`;
+        return groupHtml;
+    };
 
     // 화면에 5가지 색깔 칩이 모두 나오도록 수정
 h += renderGroup(casino.redChips, "빨간 칩 (Ace)", "redChips");
@@ -3197,6 +3192,6 @@ window.pickCasinoChip = function(chipId, color) {
     </div>
 
 </div> 
-
+</div>
 </body>
 </html>
