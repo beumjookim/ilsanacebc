@@ -3030,66 +3030,67 @@ window.getWeightedStats = function(name) {
    ============================================================ */
 // 2. [칩 생성 엔진] (사용자님의 2색 규칙 + 그룹화 구조 적용)
 // 1. 카지노 판 깔기 (등급별 빈 칩 생성)
+// 1. 카지노 판 생성: 선택한 레인(팀) 수만큼만 색깔 생성
+// 1. 카지노 판 생성: 선택한 레인(팀) 수만큼만 색깔 생성
 window.initCasino = function() {
     const participants = Array.isArray(attendees) ? attendees : [];
-    const lanes = (Array.isArray(selectedBlocks) && selectedBlocks.length > 0) 
-                  ? selectedBlocks.sort((a, b) => a - b) : [1, 2];
+    const lanes = (Array.isArray(selectedBlocks) && selectedBlocks.length > 0) ? selectedBlocks : [1, 2];
     
-    if (participants.length === 0) return alert("참석자가 없습니다.");
-
-    // [원칙] 색상 수 = 레인당 인원수
-    const colorCount = Math.ceil(participants.length / lanes.length);
+    // [원칙 1] 팀 수 = 색깔 수 (2팀이면 2색, 3팀이면 3색)
+    const colorCount = lanes.length; 
     const colorKeys = ['redChips', 'blueChips', 'greenChips', 'yellowChips', 'purpleChips'];
-
     const casinoObj = { status: 'ready', mode: window.currentCasinoMode, timestamp: Date.now() };
+
+    // 한 등급당 인원 계산
+    const perColor = Math.ceil(participants.length / colorCount);
 
     for (let i = 0; i < colorCount; i++) {
         const colorKey = colorKeys[i];
-        let laneBag = lanes.map(l => ({ lane: l, team: 'A' }));
-        
-        // 인원 보정 및 셔플 (레인 찢기)
-        while (laneBag.length < Math.ceil(participants.length / colorCount)) {
-            laneBag.push({ lane: lanes[laneBag.length % lanes.length], team: 'A' });
+        let laneBag = [];
+        // 각 등급 주머니에 레인 번호를 공평하게 배분
+        for (let n = 0; n < perColor; n++) {
+            laneBag.push({ lane: lanes[n % lanes.length], team: 'A' });
         }
-        laneBag = laneBag.sort(() => Math.random() - 0.5);
+        laneBag = laneBag.sort(() => Math.random() - 0.5); // 레인 섞기
 
-        casinoObj[colorKey] = laneBag.slice(0, Math.ceil(participants.length / colorCount)).map((slot, j) => ({
+        casinoObj[colorKey] = laneBag.map((slot, j) => ({
             id: `c_${i}_${j}`,
             color: colorKey.replace('Chips', ''),
             slot: slot,
             status: 'available',
-            pickedBy: null // 현장 뽑기용 빈 칩
+            pickedBy: null
         }));
     }
     db.ref('bowling_v14/casino').set(casinoObj);
 };
 
-// 2. 칩 클릭 시 검증 (에버 등급 외 칩 선택 차단)
+// 2. 칩 클릭: 내 등급이 아닌 색을 누르면 "안 된다"고 경고창 띄움
 window.pickChip = function(color, chipId) {
-    const myName = window.currentUserName; // 현재 사용자
+    const myName = window.currentUserName;
     const participantNames = Array.isArray(attendees) ? attendees : [];
     
-    // [원칙] 실시간 에버순 정렬 (기억장소 members 참조)
+    // [에버순 정렬]
     const sortedUsers = participantNames.map(name => {
         const m = members.find(mem => mem.name === name);
         return { name: name, avg: m ? (parseInt(m.avg) || 0) : 0 };
     }).sort((a, b) => b.avg - a.avg);
 
-    // 내 실력 순위 확인
+    // 내 실력 순위(index) 확인
     const myRankIdx = sortedUsers.findIndex(u => u.name === myName);
-    const lanesCount = selectedBlocks.length; 
+    const lanesCount = selectedBlocks.length;
     
-    // 내 등급에 맞는 색깔 계산 (0~1위: red, 2~3위: blue 등)
+    // [원칙 2] 내 순위에 맞는 색깔 계산 (순위 / 팀당인원)
     const colorKeys = ['red', 'blue', 'green', 'yellow', 'purple'];
-    const requiredColor = colorKeys[Math.floor(myRankIdx / lanesCount)];
+    const myGroupIdx = Math.floor(myRankIdx / Math.ceil(participantNames.length / lanesCount));
+    const myRequiredColor = colorKeys[myGroupIdx];
 
-    // [입구 컷] 내 등급이 아닌 칩을 누르면 즉시 차단
-    if (color !== requiredColor) {
-        alert(`실력 등급 제한: 당신은 [${requiredColor.toUpperCase()}] 칩만 선택할 수 있습니다!`);
-        return;
+    // 등급이 다르면 경고창 띄우고 중단
+    if (color !== myRequiredColor) {
+        alert(`당신의 등급은 [${myRequiredColor.toUpperCase()}]입니다. 다른 색은 뽑을 수 없습니다!`);
+        return; 
     }
 
-    // 통과 시 Firebase 업데이트 (배정 완료)
+    // 등급이 맞을 때만 DB 업데이트
     db.ref(`bowling_v14/casino/${color}Chips/${chipId}`).update({
         pickedBy: myName,
         status: 'picked'
