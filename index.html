@@ -2166,7 +2166,7 @@ window.finishCasino = function() {
     
     allChips.forEach(chip => {
         const laneNo = chip.slot.lane; 
-        const teamNo = chip.slot.teamNo; // ★ 이제 에러 없이 팀 번호를 정확히 읽어옵니다!
+        const teamNo = chip.slot.teamNo || chip.slot.team; // 두 방식 모두 대응
 
         if (!finalTeamsMap[teamNo]) {
             finalTeamsMap[teamNo] = { teamNo: teamNo, members: [], totalAvg: 0 };
@@ -2178,7 +2178,6 @@ window.finishCasino = function() {
             finalTeamsMap[teamNo].members.push({ name: chip.pickedBy, lane: laneNo, avg: avg, score: 0 });
             finalTeamsMap[teamNo].totalAvg += avg;
         } else {
-            // 빈 자리는 고스트로 채움
             finalTeamsMap[teamNo].members.push({ name: "👻고스트", lane: laneNo, avg: 0, score: 0, isGhost: true });
         }
     });
@@ -2199,69 +2198,9 @@ window.finishCasino = function() {
     }).catch(err => {
         alert("저장 실패: " + err.message);
     });
-};
-    if (!isAdmin) return alert("관리자만 종료할 수 있습니다.");
-    if (!confirm("카지노 배정을 종료하고 '점수 입력창'으로 바로 이동할까요?")) return;
-
-    if (!window.casino) return alert("카지노 데이터가 없습니다.");
-
-    // 1. 테이블에 깔린 모든 칩 모으기
-    const allChips = [
-        ...(window.casino.redChips || []),
-        ...(window.casino.blueChips || []),
-        ...(window.casino.greenChips || []),
-        ...(window.casino.yellowChips || []),
-        ...(window.casino.purpleChips || [])
-    ];
-
-    let finalTeamsMap = {}; 
+}; // ★ 괄호 마무리
     
-    // 2. 칩을 확인하여 공식 팀 명단(gameTeams)으로 변환
-    allChips.forEach(chip => {
-        const laneNo = chip.slot.lane; 
-        const teamNo = chip.slot.team; 
-
-        if (!finalTeamsMap[teamNo]) {
-            finalTeamsMap[teamNo] = { teamNo: teamNo, members: [], totalAvg: 0 };
-        }
-
-        if (chip.pickedBy) {
-            // 사람이 뽑은 칩은 진짜 이름과 에버를 넣음
-            const stats = window.getWeightedStats(chip.pickedBy);
-            const avg = stats.weightedAvg || 0;
-            finalTeamsMap[teamNo].members.push({ name: chip.pickedBy, lane: laneNo, avg: avg, score: 0 });
-            finalTeamsMap[teamNo].totalAvg += avg;
-        } else {
-            // ★ 인원이 안 맞아서 아무도 안 뽑은 빈 칩 = 👻고스트 처리!
-            finalTeamsMap[teamNo].members.push({ name: "👻고스트", lane: laneNo, avg: 0, score: 0, isGhost: true });
-        }
-    });
-
-    // 3. 배열 변환 및 팀별 매치 핸디캡 계산
-    let finalTeams = Object.values(finalTeamsMap).sort((a,b) => a.teamNo - b.teamNo);
-    const maxAvg = Math.max(...finalTeams.map(t => t.totalAvg), 0);
-    finalTeams.forEach(t => t.matchHandy = Math.max(0, Math.round(maxAvg - t.totalAvg)));
-
-    // 4. Firebase 저장 후 '입력창'으로 쾌속 이동
-    const updates = {};
-    updates[`bowling_v14/gameTeams/${currentTargetGame}`] = finalTeams; // 공식 명단 확정
-    updates['bowling_v14/casino/status'] = 'finished'; // 카지노판 종료
-    updates['bowling_v14/settings/currentTab'] = 'inputPanel'; // ★ DB에도 입력창 탭으로 저장
-    updates['bowling_v14/settings/currentInputGame'] = currentTargetGame; // 현재 1G, 2G 유지
-
-    db.ref().update(updates).then(() => {
-        alert("✅ 배정 완료! 점수 입력창으로 바로 이동합니다.");
-        
-        // ★ 화면 강제 이동 (4. 입력 패널 띄우기)
-        const tabBtns = document.querySelectorAll('.tab-btn');
-        window.showPanel('inputPanel', tabBtns[4]); // 5번째 버튼이 [4.입력]
-        
-    }).catch(err => {
-        alert("저장 실패: " + err.message);
-    });
-};
-
-window.nextTeam = function(lane, current) {
+    window.nextTeam = function(lane, current) {
     let next = (current >= 8) ? 0 : current + 1;
     window.updateConfig('team_' + lane, next);
 };
