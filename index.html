@@ -3229,59 +3229,7 @@ window.finishMeetingAndArchive = function() {
     });
 };
 
-window.pickCasinoChip = function(chipId, color) {
-    const myName = (loggedInUser || "").trim();
-    if (!myName) return alert("로그인이 필요합니다.");
 
-    // 중복 선택 방지
-    const allChips = [
-        ...(window.casino.redChips || []), ...(window.casino.blueChips || []),
-        ...(window.casino.greenChips || []), ...(window.casino.yellowChips || []),
-        ...(window.casino.purpleChips || [])
-    ];
-    if (allChips.some(c => c.pickedBy === myName)) return alert("이미 칩을 뽑으셨습니다!");
-
-    // [수정 2] 진짜 에버리지 계산기(getWeightedStats)를 사용해 완벽한 줄 세우기!
-    const participants = Array.isArray(attendees) ? attendees.filter(n => n && !n.includes("고스트")) : [];
-    const sortedUsers = participants.map(name => {
-        const stats = window.getWeightedStats(name);
-        return { name: name, avg: stats.weightedAvg || 0 }; 
-    }).sort((a, b) => b.avg - a.avg);
-
-    const myRankIdx = sortedUsers.findIndex(u => u.name === myName);
-    if (myRankIdx === -1) return alert("참석자 명단에서 이름을 찾을 수 없습니다.");
-
-    // [수정 3] 실제 배정된 팀 수에 맞춰 내 등급 색깔 찾기
-    let activeLanesCount = 0;
-    let countedTeams = [];
-    for (let l = 1; l <= 20; l++) {
-        let t = parseInt(laneSettings['team_' + l]) || 0;
-        if (t > 0 && !countedTeams.includes(t)) {
-            countedTeams.push(t);
-            activeLanesCount++;
-        }
-    }
-    const lanesCount = activeLanesCount || 2;
-    const perColor = Math.ceil(participants.length / lanesCount);
-    
-    const colorKeys = ['red', 'blue', 'green', 'yellow', 'purple'];
-    const myRequiredColor = colorKeys[Math.floor(myRankIdx / perColor)];
-
-    // ★ [핵심] 등급이 다르면 자비 없이 차단! (화면 버튼과 완벽 연결)
-    if (color !== myRequiredColor) {
-        alert(`🚨 [잘못된 선택] 당신의 실력 등급은 [${myRequiredColor.toUpperCase()}] 칩입니다!\n다른 색상의 칩을 선택해 주세요.`);
-        return; 
-    }
-
-    // 조건 통과 시 칩 획득
-    const chipKey = `${color}Chips`;
-    const chipIdx = window.casino[chipKey].findIndex(c => c.id === chipId);
-
-    if (chipIdx > -1) {
-        db.ref(`bowling_v14/casino/${chipKey}/${chipIdx}/pickedBy`).set(myName);
-        db.ref(`bowling_v14/casino/pickedCount`).transaction(count => (count || 0) + 1);
-    }
-};
 </script> 
 
 <div id="admin-notice-panel" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width: 90%; max-width: 400px; background:#fff; z-index:10000; border:3px solid #FFEB33; padding:20px; border-radius:15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
