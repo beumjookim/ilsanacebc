@@ -327,7 +327,22 @@
     font-weight: bold;
     color: white;
 }
+/* 칩들이 구역별로 정렬될 때의 여백과 제목 스타일 */
+#casinoArea h3 {
+    color: #fff;
+    font-size: 0.9rem;
+    margin: 20px 0 10px 0;
+    border-left: 4px solid #f1c40f;
+    padding-left: 10px;
+    text-align: left;
+}
 
+.chip-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(65px, 1fr));
+    gap: 12px;
+    justify-items: center;
+}
 /* 등급별 칩 색상 */
 .redChips .chip-front { background: radial-gradient(#ff4d4d, #b30000); }
 .blueChips .chip-front { background: radial-gradient(#4d94ff, #0044cc); }
@@ -506,40 +521,27 @@
     
     
 </div>
-            <div id="casinoPanel" class="panel">
-                <div class="casino-table">
-                    <h2 style="color: #f1c40f; margin-top:0; text-shadow: 2px 2px 4px #000;">🎰 ACE CASINO TABLE</h2>
-                    <div id="casinoStatus" style="font-size:1rem; margin-bottom:20px; color:#fff; font-weight:bold;">
-                        원하는 번호의 칩을 빠르게 선택하세요!
-                    </div>
-                    
-                    <div class="tier-zone" id="zone_red">
-                        <div style="color:#ff7675; font-weight:bold; font-size:0.9rem; margin-bottom:5px;">🔴 RED CHIPS (상위)</div>
-                        <div id="chips_red" class="chip-container"></div>
-                    </div>
-                    <div class="tier-zone" id="zone_blue" style="margin-top:25px;">
-                        <div style="color:#74b9ff; font-weight:bold; font-size:0.9rem; margin-bottom:5px;">🔵 BLUE CHIPS (중위)</div>
-                        <div id="chips_blue" class="chip-container"></div>
-                    </div>
-                    <div class="tier-zone" id="zone_green" style="margin-top:25px; display:none;">
-                        <div style="color:#55efc4; font-weight:bold; font-size:0.9rem; margin-bottom:5px;">🟢 GREEN CHIPS (하위)</div>
-                        <div id="chips_green" class="chip-container"></div>
-                    </div>
-                    <div class="tier-zone" id="zone_yellow" style="margin-top:25px; display:none;">
-                        <div style="color:#f1c40f; font-weight:bold; font-size:0.9rem; margin-bottom:5px;">🟡 YELLOW CHIPS (최하위)</div>
-                        <div id="chips_yellow" class="chip-container"></div>
-                    </div>
-                    <div id="adminCasinoControls" style="margin-top:40px; border-top:1px solid rgba(255,255,255,0.2); padding-top:20px;">
-                        <button class="universal-btn" style="background:#f1c40f; color:#000;" onclick="window.initCasino()">🎲 카지노판 새로 깔기 (칩 생성)</button>
-                        <button class="universal-btn" style="background:#e67e22; margin-top:10px;" onclick="window.finishCasino()">👻 고스트 확인 및 배정 종료</button>
-                    </div>
-                </div>
-            </div>
-            <div id="casinoArea" style="min-height: 300px; padding: 10px;">
-    <p style="text-align:center; color:#999; padding-top:50px;">
-        관리자가 [카지노 초기화]를 누르면 여기에 칩이 나타납니다.
-    </p>
+           <div id="casinoPanel" class="panel">
+    <div class="casino-table">
+        <h2 style="color: #f1c40f; margin-top:0; text-shadow: 2px 2px 4px #000;">🎰 ACE CASINO TABLE</h2>
+        
+        <div id="casinoStatus" style="font-size:1rem; margin-bottom:20px; color:#fff; font-weight:bold;">
+            원하는 번호의 칩을 빠르게 선택하세요!
+        </div>
+
+        <div id="casinoArea" style="min-height: 250px; padding: 10px;">
+            <p style="text-align:center; color:rgba(255,255,255,0.5); padding-top:50px;">
+                관리자가 [카지노 판 새로 짜기]를 누르면<br>이 테이블 위에 칩이 나타납니다.
+            </p>
+        </div>
+
+        <div id="adminCasinoControls" style="margin-top:40px; border-top:1px solid rgba(255,255,255,0.2); padding-top:20px;">
+            <button class="universal-btn" style="background:#f1c40f; color:#000;" onclick="window.initCasino()">🎲 카지노판 새로 깔기 (칩 생성)</button>
+            <button class="universal-btn" style="background:#e67e22; margin-top:10px;" onclick="window.finishCasino()">👻 고스트 확인 및 배정 종료</button>
+        </div>
+    </div>
 </div>
+            
 
             <div id="progressPanel" class="panel">
                 <div class="input-box">
