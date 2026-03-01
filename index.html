@@ -281,78 +281,92 @@
         padding: 8px !important;      /* 여백도 줄임 */
         height: 40px !important;
     }
-    /* 카지노 칩 스타일 */
+  /* 🎰 카지노 칩 & 이중 셔플 스타일 통합본 */
+
+/* 1. 칩이 배치되는 그리드 판 */
 .chip-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-    gap: 15px;
+    /* 모바일 대응: 최소 70px 크기로 빈틈없이 채움 */
+    grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); 
+    gap: 12px;
     margin-top: 10px;
+    justify-items: center; /* 칩을 가운데 정렬 */
 }
 
+/* 2. 칩 바구니 (입체 효과의 토대) */
 .casino-chip {
-    width: 80px;
-    height: 80px;
-    perspective: 1000px;
+    width: 70px;
+    height: 70px;
+    perspective: 1000px; /* 뒤집힐 때의 깊이감 */
     cursor: pointer;
-    margin: 0 auto;
+    margin: 5px;
 }
 
+/* 3. 실제 뒤집히는 알맹이 */
 .chip-inner {
     position: relative;
     width: 100%;
     height: 100%;
     text-align: center;
-    transition: transform 0.6s;
+    transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); /* 부드러운 회전 */
     transform-style: preserve-3d;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3); /* 테이블 위 그림자 */
     border-radius: 50%;
 }
 
-/* 칩을 클릭해서 선택됐을 때(picked) 뒤집히는 효과 */
+/* 칩이 선택(picked)되었을 때 180도 회전 */
 .casino-chip.picked .chip-inner {
     transform: rotateY(180deg);
 }
 
+/* 4. 앞면(물음표)과 뒷면(레인번호) 공통 설정 */
 .chip-front, .chip-back {
     position: absolute;
     width: 100%;
     height: 100%;
-    backface-visibility: hidden;
+    backface-visibility: hidden; /* 뒤집혔을 때 반대편 안 보이게 */
+    border-radius: 50%;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    border-radius: 50%;
-    border: 4px dashed rgba(255,255,255,0.3);
+    border: 4px dashed rgba(255,255,255,0.4); /* 칩 특유의 점선 테두리 */
+    box-sizing: border-box;
     font-weight: bold;
     color: white;
 }
-/* 칩들이 구역별로 정렬될 때의 여백과 제목 스타일 */
-#casinoArea h3 {
-    color: #fff;
-    font-size: 0.9rem;
-    margin: 20px 0 10px 0;
-    border-left: 4px solid #f1c40f;
-    padding-left: 10px;
-    text-align: left;
+
+/* 앞면: 선택 전 "?" 표시 */
+.chip-front {
+    z-index: 2;
+    font-size: 1.5rem;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
 }
 
-.chip-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(65px, 1fr));
-    gap: 12px;
-    justify-items: center;
-}
-/* 등급별 칩 색상 */
-.redChips .chip-front { background: radial-gradient(#ff4d4d, #b30000); }
-.blueChips .chip-front { background: radial-gradient(#4d94ff, #0044cc); }
-.yellowChips .chip-front { background: radial-gradient(#ffd633, #b38f00); }
-.greenChips .chip-front { background: radial-gradient(#5cd65c, #1e7b1e); }
-.purpleChips .chip-front { background: radial-gradient(#a29bfe, #6c5ce7); }
+/* 뒷면: 선택 후 레인번호 표시 */
 .chip-back {
     background: #2c3e50;
     color: white;
-    transform: rotateY(180deg);
+    transform: rotateY(180deg); /* 미리 뒤집어 놓음 */
+    font-size: 0.8rem;
+}
+
+/* 5. 등급별 칩 색상 (앞면에 그라데이션 적용) */
+.redChips .chip-front    { background: radial-gradient(#ff4d4d, #b30000); }
+.blueChips .chip-front   { background: radial-gradient(#4d94ff, #0044cc); }
+.yellowChips .chip-front { background: radial-gradient(#ffd633, #b38f00); }
+.greenChips .chip-front  { background: radial-gradient(#5cd65c, #1e7b1e); }
+.purpleChips .chip-front { background: radial-gradient(#a29bfe, #6c5ce7); }
+
+/* 6. 구역 제목 (Ace, Pro 등) */
+#casinoArea h3 {
+    color: #fff;
+    font-size: 0.95rem;
+    margin: 25px 0 10px 0;
+    border-left: 4px solid #f1c40f;
+    padding-left: 10px;
+    text-align: left;
+    text-shadow: 1px 1px 2px #000;
 }
    </style>
 </head>
@@ -3019,9 +3033,7 @@ window.getWeightedStats = function(name) {
    🎰 [카지노 엔진] 수정본 (객체 구조 및 이름 배열 대응)
    ============================================================ */
 window.initCasino = function() {
-    const isIndividual = (settings.mode === 'individual'); 
-    
-    // 1. 레인 슬롯 생성
+    // 1. 레인 설정값 가져오기
     let allSlots = [];
     for (let l = 1; l <= 20; l++) {
         const count = parseInt(laneSettings['cnt_' + l]) || 0;
@@ -3033,56 +3045,33 @@ window.initCasino = function() {
         }
     }
 
-    if (allSlots.length === 0) return alert("❌ [2. 조편성]에서 레인별 인원(팀 번호 포함)을 먼저 설정해주세요!");
-    if (attendees.length === 0) return alert("❌ 선택된 참석자가 없습니다!");
+    if (allSlots.length === 0) return alert("❌ [조편성]에서 레인과 팀 번호를 먼저 설정해주세요!");
 
-    // 2. 등급별 인원 분류 (purpleCount 추가)
-    let redCount = 0, blueCount = 0, greenCount = 0, yellowCount = 0, purpleCount = 0;
-    
-    attendees.forEach(name => {
-        if (isIndividual) { 
-            redCount++; 
-        } else {
-            const tier = window.calculateTierByName(name); 
-            if (tier === 'red') redCount++;
-            else if (tier === 'blue') blueCount++;
-            else if (tier === 'green') greenCount++;
-            else if (tier === 'yellow') yellowCount++;
-            else purpleCount++; // 5번째 티어: 보라색 카운트
-        }
-    });
+    // 🌀 [이중 셔플 - 1단계] 레인 자리 자체를 무작위로 마구 섞음 (배후의 섞기)
+    allSlots.sort(() => Math.random() - 0.5);
 
-    // 3. [셔플 1] 레인 자리 무작위 섞기
-    for (let i = allSlots.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [allSlots[i], allSlots[j]] = [allSlots[j], allSlots[i]];
-    }
+    // 2. 등급별 인원 파악 및 칩 생성
+    const createChips = (color) => {
+        // 해당 등급의 사람 수만큼 칩 생성 (자리 배분)
+        let groupCount = attendees.filter(n => window.calculateTierByName(n) === color).length;
+        if (settings.mode === 'individual') groupCount = (color === 'red') ? attendees.length : 0;
 
-    // 4. [셔플 2] 칩 생성 및 슬롯 매칭
-    const createChips = (count, color) => {
-        return Array.from({length: count}, (_, i) => ({
+        return Array.from({length: groupCount}, (_, i) => ({
             id: `${color}_${i}`,
             color: color,
-            slot: allSlots.pop() || {lane: '?', teamNo: 0},
+            slot: allSlots.pop() || {lane: '?', teamNo: 0}, // 섞인 자리를 칩 뒤에 숨김
             pickedBy: null
         }));
     };
 
-    // 5컬러 칩 데이터 생성 (모든 카운트 정상 반영)
     const casinoData = {
-        redChips: createChips(redCount, 'red'),
-        blueChips: createChips(blueCount, 'blue'),
-        greenChips: createChips(greenCount, 'green'),
-        yellowChips: createChips(yellowCount, 'yellow'),
-        purpleChips: createChips(purpleCount, 'purple'),
-        pickedCount: 0,
-        totalCount: attendees.length,
-        status: 'ongoing'
+        redChips: createChips('red'), blueChips: createChips('blue'),
+        greenChips: createChips('green'), yellowChips: createChips('yellow'),
+        purpleChips: createChips('purple'), status: 'ongoing'
     };
 
-    // 5. Firebase 저장
     db.ref('bowling_v14/casino').set(casinoData).then(() => {
-        alert("🎰 5컬러 이중 셔플 완료! 카지노 탭에서 칩을 선택하세요.");
+        alert("🎰 이중 셔플 완료! 이제 카지노 탭에서 본인 등급의 칩을 뽑으세요.");
     });
 };
 
@@ -3107,47 +3096,43 @@ window.calculateTierByName = function(name) {
 // 2. 카지노 화면 렌더링 (칩 뒤집기 애니메이션 포함)
 window.renderCasino = function() {
     const area = document.getElementById('casinoArea');
-    if (!casino || !area) return;
+    // 데이터가 없거나 출력 영역이 없으면 중단
+    if (!window.casino || !area) return;
 
-    const myName = (loggedInUser || "").trim();
-    const myInfo = attendees.find(a => a.name === myName);
-    const isIndividual = (settings.mode === 'individual');
-
-    let h = `<div class="casino-container">
-                <p style="text-align:center; color:#666; margin-bottom:20px;">
-                    💡 에버 등급에 맞는 칩을 클릭하여 레인을 선점하세요!
-                </p>`;
+    let h = `<div class="casino-welcome-msg">🎰 본인 에버 등급의 칩을 클릭하세요!</div>`;
 
     const renderGroup = (chips, title, className) => {
         if (!chips || chips.length === 0) return '';
         
-        let groupHtml = `<h3 style="margin-top:20px;">● ${title}</h3><div class="chip-grid ${className}">`;
+        // 제목 부분 (CSS에서 스타일을 잡았으므로 클래스만 잘 주면 됩니다)
+        let html = `<h3>● ${title}</h3>`;
+        html += `<div class="chip-grid ${className}">`; // 인라인 style 제거
         
         chips.forEach(c => {
-            const isPicked = c.pickedBy !== null;
-            groupHtml += `
+            const isPicked = !!c.pickedBy; // 선택 여부 확인
+            
+            html += `
                 <div class="casino-chip ${isPicked ? 'picked' : ''}" 
                      onclick="if(!${isPicked}) window.pickCasinoChip('${c.id}', '${c.color}')">
                     <div class="chip-inner">
                         <div class="chip-front">?</div>
                         <div class="chip-back">
-                            <span style="font-size:0.8rem;">${c.slot.lane}L</span><br>
-                            <span style="font-size:0.7rem;">${c.pickedBy || ''}</span>
+                            <b class="lane-number">${c.slot.lane}L</b>
+                            <span class="picker-name">${c.pickedBy || ''}</span>
                         </div>
                     </div>
                 </div>`;
         });
-        groupHtml += `</div>`;
-        return groupHtml;
+        html += `</div>`;
+        return html;
     };
 
-    // 화면에 5가지 색깔 칩이 모두 나오도록 수정
-h += renderGroup(casino.redChips, "빨간 칩 (Ace)", "redChips");
-h += renderGroup(casino.blueChips, "파란 칩 (Pro)", "blueChips");
-h += renderGroup(casino.greenChips, "초록 칩 (Junior)", "greenChips"); // 복구
-h += renderGroup(casino.yellowChips, "노란 칩 (Senior)", "yellowChips");
-h += renderGroup(casino.purpleChips, "보라 칩 (Special)", "purpleChips"); // 복구
-    h += `</div>`;
+    // 5가지 등급 순차적으로 렌더링
+    h += renderGroup(window.casino.redChips, "빨간 칩 (Ace)", "redChips");
+    h += renderGroup(window.casino.blueChips, "파란 칩 (Pro)", "blueChips");
+    h += renderGroup(window.casino.greenChips, "초록 칩 (Junior)", "greenChips");
+    h += renderGroup(window.casino.yellowChips, "노란 칩 (Senior)", "yellowChips");
+    h += renderGroup(window.casino.purpleChips, "보라 칩 (Special)", "purpleChips");
 
     area.innerHTML = h;
 };
