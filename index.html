@@ -503,21 +503,24 @@
         <span id="displayJungmoName">미정</span>
     </div>
 
-    <div style="display:flex; gap:6px; margin-bottom:15px;">
+    <div id="regularSection" style="display:none; gap:6px; margin-bottom:15px;">
     <button type="button" onclick="window.runGeneralAssignment()" 
-            style="flex:1; height:38px; background:#3498db; color:white; border:none; border-radius:6px; font-weight:bold; font-size:0.9rem; cursor:pointer; padding:0; box-shadow:0 1px 3px rgba(0,0,0,0.1);">
-        ⚖️ 일반 배정
-    </button>
-
-    <button type="button" onclick="window.initCasinoFromSetup()" 
-            style="flex:1; height:38px; background:#e67e22; color:white; border:none; border-radius:6px; font-weight:bold; font-size:0.9rem; cursor:pointer; padding:0; box-shadow:0 1px 3px rgba(0,0,0,0.1);">
-        🎰 카지노 판 깔기
-    </button>
-
+            style="flex:2; height:45px; background:#3498db; color:white; border:none; border-radius:8px; font-weight:bold;">⚖️ 일반 배정</button>
     <button type="button" onclick="window.resetAssignment()" 
-            style="flex:1; height:38px; background:white; border:1px solid #c0392b; color:#c0392b; border-radius:6px; font-weight:bold; font-size:0.9rem; cursor:pointer; padding:0; box-shadow:0 1px 3px rgba(0,0,0,0.1);">
-        🗑️ 초기화
-    </button>
+            style="flex:1; height:45px; background:white; border:1px solid #c0392b; color:#c0392b; border-radius:8px; font-weight:bold;">🗑️ 초기화</button>
+</div>
+
+<div id="casinoSection" class="input-box" style="display:none; text-align:center; border: 2px solid var(--warning); background:#fff;">
+    <div style="margin-bottom:12px; font-weight:bold; color:var(--dark);">🎰 카지노 게임</div>
+    
+    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+        <button id="btnTeamMode" class="universal-btn" style="background:var(--accent); flex:1; margin-bottom:0;" onclick="window.setGameMode('team')">👥 팀전</button>
+        <button id="btnSoloMode" class="universal-btn" style="background:#ccc; flex:1; margin-bottom:0;" onclick="window.setGameMode('individual')">👤 개인전</button>
+    </div>
+    
+    <button class="universal-btn" style="background:var(--warning); color:#000; font-size:1.1rem;" onclick="window.initCasinoFromSetup()">🚀 게임 시작</button>
+    
+    <button class="universal-btn" style="background:white; border:1px solid #c0392b; color:#c0392b; margin-top:10px; font-size:0.9rem;" onclick="window.resetAssignment()">🗑️ 초기화</button>
 </div>
 
     <div id="laneConfigArea" class="lane-config-grid"></div>
@@ -965,13 +968,14 @@ window.updateUI = function() {
     if(window.isConfigEditing || window.isScoreEditing) return;
 
     const myName = loggedInUser.trim();
-    const isL = settings.mode === 'lightning';
+    const isL = settings.mode === 'lightning'; // ⚡ 번개모임 여부 변수 (이미 있음)
     const uInfo = document.getElementById('userInfo');
     const settingsTab = document.getElementById('settingsTabBtn');
     
     if(uInfo) uInfo.innerText = `${loggedInUser} ${isAdmin ? '(관리자)' : ''}`;
     if(settingsTab) settingsTab.style.display = isAdmin ? 'block' : 'none';
 
+    // 1. 구역 버튼 색상 (z1~z5)
     for(let i=1; i<=5; i++) {
         const btn = document.getElementById('z'+i);
         if(btn) {
@@ -981,6 +985,7 @@ window.updateUI = function() {
     }
     if(window.renderCustomLaneConfig) window.renderCustomLaneConfig(); 
 
+    // 2. 상단 타이틀 표시
     const panelTitle = document.getElementById('modeDisplay');
     if(panelTitle) {
         panelTitle.innerHTML = isL ? 
@@ -988,12 +993,26 @@ window.updateUI = function() {
             '<span style="color:#2c3e50;">⚖️ 정기모임 (4게임)</span>';
     }
 
+    // 🎯 [여기에 새로운 로직 추가됨] 정기/번개에 따른 버튼 구역 제어
+    const regSec = document.getElementById('regularSection'); // 정기용 버튼 구역
+    const casSec = document.getElementById('casinoSection'); // 번개용 카지노 구역
+
+    if (isL) {
+        // 번개일 때: 카지노 게임 박스만 보여줌
+        if(regSec) regSec.style.display = 'none';
+        if(casSec) casSec.style.display = 'block';
+    } else {
+        // 정기일 때: 일반 배정 버튼만 보여줌
+        if(regSec) regSec.style.display = 'flex';
+        if(casSec) casSec.style.display = 'none';
+    }
+
+    // 3. 운영진 명칭 및 권한 설정
     const jName = document.getElementById('displayJungmoName');
     const managerLabel = document.querySelector('.box-manager span:first-child');
 
     if (jName) {
         jName.innerText = isL ? (managers.lightning || '미정') : (managers.jungmo || '미정');
-        
         if (managerLabel) {
             managerLabel.innerText = isL ? '⚡ 번개장' : '👑 정모장';
         }
@@ -1003,6 +1022,7 @@ window.updateUI = function() {
     const currentBungaeJang = (managers.lightning || "").trim();
     let hasPower = isAdmin || (isL ? currentBungaeJang === myName : currentJungmoJang === myName);
 
+    // 4. 관리자 전용 박스 표시 여부
     const eventCreateBox = document.getElementById('adminEventCreate');
     const eventSelectBox = document.getElementById('activeMeetingSelector');
     const memAdminBox = document.getElementById('adminMemberControls');
@@ -1024,15 +1044,14 @@ window.updateUI = function() {
     const bNameSpan = document.getElementById('currentBungaeJang');
     if (bNameSpan) bNameSpan.innerText = managers.lightning || '없음';
 
-    // ▼▼▼ 화면 그리기 함수들 모음 ▼▼▼
+    // 5. 각종 렌더링 함수 실행
     if(typeof window.renderEventList === 'function') window.renderEventList();
     if(typeof window.renderAssignGameTabs === 'function') window.renderAssignGameTabs(); 
     if(typeof window.renderMembers === 'function') window.renderMembers();
     if(typeof window.renderCasino === 'function') window.renderCasino();
-    
-    // ★ [추가된 한 줄] 번개장 명단 그리기
     if(typeof window.renderBungaeJangSelect === 'function') window.renderBungaeJangSelect();
 
+    // 6. 설정값 동기화 및 패널별 추가 렌더링
     if(document.getElementById('groupAssignMethod')) 
         document.getElementById('groupAssignMethod').value = settings.assignMethod || 'snake';
     if(document.getElementById('setAssignMethod')) 
