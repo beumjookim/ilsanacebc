@@ -2151,58 +2151,55 @@ window.getMyTier = function() {
 };
 
 window.finishCasino = function() {
-    const myName = (loggedInUser || "").trim();
-    const isBoss = isAdmin || (managers.jungmo === myName) || (managers.lightning === myName);
-    if (!isBoss) return alert("🚫 권한이 없습니다.");
+    if (!isAdmin) return alert("관리자만 종료할 수 있습니다.");
+    if (!confirm("카지노 배정을 종료하고 진행 페이지로 이동할까요?")) return;
 
-    if (!confirm("배정을 종료하고 진행 페이지로 이동할까요?")) return;
+    // 1. 현재 카지노 칩 결과(casinoData)를 기반으로 공식 팀(gameTeams) 생성
+    const newTeams = {};
+    const currentLanes = selectedBlocks || [1, 2, 3, 4, 5]; // 현재 선택된 구역/레인
 
-    db.ref('bowling_v14/casino').once('value', sn => {
-        const data = sn.val() || {};
-        
-        let pickedOwners = [];
-        ['red', 'blue', 'green', 'yellow', 'purple'].forEach(t => {
-            if(data[t]) Object.values(data[t]).forEach(c => { if(c.status==='picked') pickedOwners.push(c.owner); });
-        });
-        let unpickedPeople = attendees.filter(name => !pickedOwners.includes(name));
-        let finalTeamsMap = {}; 
-        
-        ['red', 'blue', 'green', 'yellow', 'purple'].forEach(tier => {
-            if(!data[tier]) return;
-            Object.values(data[tier]).forEach(c => {
-                const teamNum = parseInt(laneSettings['team_' + c.lane]);
-                if(!teamNum) return;
-                if(!finalTeamsMap[teamNum]) finalTeamsMap[teamNum] = { teamNo: teamNum, members: [], totalAvg: 0, matchHandy: 0 };
-                
-                let isPicked = (c.status === 'picked');
-                let memberName = isPicked ? c.owner : (unpickedPeople.length > 0 ? unpickedPeople.shift() : "👻고스트");
-                let stats = window.getWeightedStats(memberName);
-                let mInfo = members.find(x => x.name === memberName.trim()) || { handicap: 0 };
-                let weightedAvg = memberName.includes("고스트") ? 0 : stats.weightedAvg;
-
-                finalTeamsMap[teamNum].members.push({
-                    name: memberName, lane: c.lane, avg: weightedAvg,
-                    handy: parseInt(mInfo.handicap) || 0, score: 0, isGhost: memberName.includes("고스트")
-                });
-                finalTeamsMap[teamNum].totalAvg += weightedAvg;
-            });
-        });
-
-        const teamArr = Object.values(finalTeamsMap).sort((a,b) => a.teamNo - b.teamNo);
-        const maxAvg = Math.max(...teamArr.map(t => t.totalAvg)); 
-        teamArr.forEach(t => t.matchHandy = (t.totalAvg < maxAvg) ? Math.round(maxAvg - t.totalAvg) : 0);
+    // 카지노 칩 데이터를 순회하며 팀 구성
+    Object.keys(casinoData || {}).forEach(uid => {
+        const chip = casinoData[uid];
+        if (chip && chip.lane && chip.team) {
+            const laneKey = chip.lane + 'L'; // 예: 1L
+            const teamKey = chip.team;      // 예: A or B
             
-        db.ref(`bowling_v14/gameTeams/${currentTargetGame}`).set(teamArr).then(() => {
-            db.ref('bowling_v14/settings').update({
-                'currentTab': 'progressPanel',
-                'currentRankView': currentTargetGame
-            }).then(() => {
-                db.ref('bowling_v14/casino').set(null);
-                window.showPanel('progressPanel', document.querySelectorAll('.tab-btn')[3]);
-                alert(`✅ ${currentTargetGame}G 카지노 배정 종료!`);
-            });
-        });
-});
+            if (!newTeams[laneKey]) newTeams[laneKey] = {};
+            if (!newTeams[laneKey][teamKey]) newTeams[laneKey][teamKey] = [];
+            
+            // 참가자 이름 찾기 (members 데이터 참조)
+            const member = members[uid];
+            if (member) {
+                newTeams[laneKey][teamKey].push({
+                    uid: uid,
+                    name: member.name,
+                    handy: member.handy || 0,
+                    avg: member.avg || 0
+                });
+            }
+        }
+    });
+
+    // 2. Firebase에 공식 팀 데이터 저장 (이게 되어야 진행 페이지에 뜸)
+    const updates = {};
+    updates['bowling_v14/gameTeams'] = newTeams;
+    updates['bowling_v14/casino/status'] = 'finished'; // 카지노 종료 상태로 변경
+
+    db.ref().update(updates).then(() => {
+        alert("✅ 팀 배정이 완료되었습니다! 진행 페이지로 이동합니다.");
+        
+        // 3. 진행 페이지(progressPanel)로 화면 전환
+        window.showPanel('progressPanel');
+        
+        // 4. 즉시 화면 갱신 (핸디, 가중치 등이 계산되어 그려짐)
+        if (typeof window.renderGameProgress === 'function') {
+            window.renderGameProgress();
+        }
+    }).catch(err => {
+        console.error("카지노 종료 중 오류:", err);
+        alert("데이터 저장에 실패했습니다.");
+    });
 };
 
 window.nextTeam = function(lane, current) {
