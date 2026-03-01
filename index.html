@@ -345,18 +345,17 @@
 
 /* 뒷면: 선택 후 레인번호 표시 */
 .chip-back {
-    background: #2c3e50;
-    color: white;
+   color: white;
     transform: rotateY(180deg); /* 미리 뒤집어 놓음 */
     font-size: 0.8rem;
 }
 
 /* 5. 등급별 칩 색상 (앞면에 그라데이션 적용) */
-.redChips .chip-front    { background: radial-gradient(#ff4d4d, #b30000); }
-.blueChips .chip-front   { background: radial-gradient(#4d94ff, #0044cc); }
-.yellowChips .chip-front { background: radial-gradient(#ffd633, #b38f00); }
-.greenChips .chip-front  { background: radial-gradient(#5cd65c, #1e7b1e); }
-.purpleChips .chip-front { background: radial-gradient(#a29bfe, #6c5ce7); }
+.redChips .chip-back    { background: radial-gradient(#b30000, #ff4d4d); }
+.blueChips .chip-back   { background: radial-gradient(#0044cc, #4d94ff); }
+.yellowChips .chip-back { background: radial-gradient(#b38f00, #ffd633); }
+.greenChips .chip-back  { background: radial-gradient(#1e7b1e, #5cd65c); }
+.purpleChips .chip-back { background: radial-gradient(#6c5ce7, #a29bfe); }
 
 /* 6. 구역 제목 (Ace, Pro 등) */
 #casinoArea h3 {
@@ -2150,55 +2149,66 @@ window.getMyTier = function() {
     return 'purple'; // 5번째 티어 안내 추가
 };
 
+// 카지노 종료 후 -> 공식 팀 확정 -> 점수 입력창 직행
 window.finishCasino = function() {
     if (!isAdmin) return alert("관리자만 종료할 수 있습니다.");
-    if (!confirm("카지노 배정을 종료하고 진행 페이지로 이동할까요?")) return;
+    if (!confirm("카지노 배정을 종료하고 '점수 입력창'으로 바로 이동할까요?")) return;
 
-    // 1. 현재 카지노 칩 결과(casinoData)를 기반으로 공식 팀(gameTeams) 생성
-    const newTeams = {};
-    const currentLanes = selectedBlocks || [1, 2, 3, 4, 5]; // 현재 선택된 구역/레인
+    if (!window.casino) return alert("카지노 데이터가 없습니다.");
 
-    // 카지노 칩 데이터를 순회하며 팀 구성
-    Object.keys(casinoData || {}).forEach(uid => {
-        const chip = casinoData[uid];
-        if (chip && chip.lane && chip.team) {
-            const laneKey = chip.lane + 'L'; // 예: 1L
-            const teamKey = chip.team;      // 예: A or B
-            
-            if (!newTeams[laneKey]) newTeams[laneKey] = {};
-            if (!newTeams[laneKey][teamKey]) newTeams[laneKey][teamKey] = [];
-            
-            // 참가자 이름 찾기 (members 데이터 참조)
-            const member = members[uid];
-            if (member) {
-                newTeams[laneKey][teamKey].push({
-                    uid: uid,
-                    name: member.name,
-                    handy: member.handy || 0,
-                    avg: member.avg || 0
-                });
-            }
+    // 1. 테이블에 깔린 모든 칩 모으기
+    const allChips = [
+        ...(window.casino.redChips || []),
+        ...(window.casino.blueChips || []),
+        ...(window.casino.greenChips || []),
+        ...(window.casino.yellowChips || []),
+        ...(window.casino.purpleChips || [])
+    ];
+
+    let finalTeamsMap = {}; 
+    
+    // 2. 칩을 확인하여 공식 팀 명단(gameTeams)으로 변환
+    allChips.forEach(chip => {
+        const laneNo = chip.slot.lane; 
+        const teamNo = chip.slot.team; 
+
+        if (!finalTeamsMap[teamNo]) {
+            finalTeamsMap[teamNo] = { teamNo: teamNo, members: [], totalAvg: 0 };
+        }
+
+        if (chip.pickedBy) {
+            // 사람이 뽑은 칩은 진짜 이름과 에버를 넣음
+            const stats = window.getWeightedStats(chip.pickedBy);
+            const avg = stats.weightedAvg || 0;
+            finalTeamsMap[teamNo].members.push({ name: chip.pickedBy, lane: laneNo, avg: avg, score: 0 });
+            finalTeamsMap[teamNo].totalAvg += avg;
+        } else {
+            // ★ 인원이 안 맞아서 아무도 안 뽑은 빈 칩 = 👻고스트 처리!
+            finalTeamsMap[teamNo].members.push({ name: "👻고스트", lane: laneNo, avg: 0, score: 0, isGhost: true });
         }
     });
 
-    // 2. Firebase에 공식 팀 데이터 저장 (이게 되어야 진행 페이지에 뜸)
+    // 3. 배열 변환 및 팀별 매치 핸디캡 계산
+    let finalTeams = Object.values(finalTeamsMap).sort((a,b) => a.teamNo - b.teamNo);
+    const maxAvg = Math.max(...finalTeams.map(t => t.totalAvg), 0);
+    finalTeams.forEach(t => t.matchHandy = Math.max(0, Math.round(maxAvg - t.totalAvg)));
+
+    // 4. Firebase 저장 후 '입력창'으로 쾌속 이동
     const updates = {};
-    updates['bowling_v14/gameTeams'] = newTeams;
-    updates['bowling_v14/casino/status'] = 'finished'; // 카지노 종료 상태로 변경
+    updates[`bowling_v14/gameTeams/${currentTargetGame}`] = finalTeams; // 공식 명단 확정
+    updates['bowling_v14/casino/status'] = 'finished'; // 카지노판 종료
+    updates['bowling_v14/settings/currentTab'] = 'inputPanel'; // ★ DB에도 입력창 탭으로 저장
+    updates['bowling_v14/settings/currentInputGame'] = currentTargetGame; // 현재 1G, 2G 유지
 
     db.ref().update(updates).then(() => {
-        alert("✅ 팀 배정이 완료되었습니다! 진행 페이지로 이동합니다.");
+        alert("✅ 배정 완료! 점수 입력창으로 바로 이동합니다.");
         
-        // 3. 진행 페이지(progressPanel)로 화면 전환
-        window.showPanel('progressPanel');
+        // ★ 화면 강제 이동 (4. 입력 패널 띄우기)
+        const tabBtns = document.querySelectorAll('.tab-btn');
+        window.showPanel('inputPanel', tabBtns[4]); // 5번째 버튼이 [4.입력]
         
-        // 4. 즉시 화면 갱신 (핸디, 가중치 등이 계산되어 그려짐)
-        if (typeof window.renderGameProgress === 'function') {
-            window.renderGameProgress();
-        }
     }).catch(err => {
-        console.error("카지노 종료 중 오류:", err);
-        alert("데이터 저장에 실패했습니다.");
+        alert("저장 실패: " + err.message);
     });
 };
 
