@@ -3032,40 +3032,87 @@ window.getWeightedStats = function(name) {
 // 1. 카지노 판 깔기 (등급별 빈 칩 생성)
 // 1. 카지노 판 생성: 선택한 레인(팀) 수만큼만 색깔 생성
 // 1. 카지노 판 생성: 선택한 레인(팀) 수만큼만 색깔 생성
+// 1. 카지노 생성 (팀 수 = 색깔 수, 빈 배열 초기화 필수)
 window.initCasino = function() {
-    const participants = Array.isArray(attendees) ? attendees : [];
-    const lanes = (Array.isArray(selectedBlocks) && selectedBlocks.length > 0) ? selectedBlocks : [1, 2];
+    const participantNames = Array.isArray(attendees) ? attendees : [];
+    const lanes = (Array.isArray(selectedBlocks) && selectedBlocks.length > 0) 
+                  ? selectedBlocks.sort((a, b) => a - b) : [1, 2];
     
-    if (participants.length === 0) return alert("참석자가 없습니다.");
+    const total = participantNames.length;
+    if (total === 0) return alert("참석자가 없습니다.");
 
-    // [원칙 1] 팀 수 = 색깔 수 (2팀이면 2색)
-    const colorCount = lanes.length; 
-    const colorKeys = ['red', 'blue', 'green', 'yellow', 'purple']; // 칩 이름 접두어
-    const casinoObj = { status: 'ready', mode: window.currentCasinoMode, timestamp: Date.now() };
+    // [원칙 1] 팀 수 = 색깔 수
+    const lanesCount = lanes.length; 
+    const colorKeys = ['red', 'blue', 'green', 'yellow', 'purple'];
+    
+    // ★ 핵심: 이전 데이터 간섭을 막기 위해 모든 색상을 빈 배열로 확실히 초기화
+    const casinoObj = { 
+        redChips: [], blueChips: [], greenChips: [], yellowChips: [], purpleChips: [],
+        status: 'ready', mode: window.currentCasinoMode, timestamp: Date.now() 
+    };
 
-    // 등급당 인원 계산 (예: 4명 2팀이면 등급당 2명)
-    const perColor = Math.ceil(participants.length / colorCount);
+    // 등급당 인원 계산 (예: 12명 3팀 = 4명, 5명 2팀 = 3명)
+    const perColor = Math.ceil(total / lanesCount);
 
-    for (let i = 0; i < colorCount; i++) {
-        const colorName = colorKeys[i]; // 여기서 i에 따라 red, blue, green...이 결정됨
-        const colorKey = colorName + 'Chips'; // redChips, blueChips...
+    for (let i = 0; i < lanesCount; i++) {
+        const colorName = colorKeys[i];
         
+        // 레인 주머니 만들고 섞기
         let laneBag = [];
         for (let n = 0; n < perColor; n++) {
-            laneBag.push({ lane: lanes[n % lanes.length], team: 'A' });
+            laneBag.push({ lane: lanes[n % lanesCount], team: 'A' });
         }
-        laneBag = laneBag.sort(() => Math.random() - 0.5); // 레인 섞기
+        laneBag = laneBag.sort(() => Math.random() - 0.5); 
 
-        // 생성되는 칩에 각 등급의 색상을 정확히 주입
-        casinoObj[colorKey] = laneBag.map((slot, j) => ({
-            id: `c_${i}_${j}`,
-            color: colorName, // 이 부분이 red, blue 등으로 바뀌어야 합니다!
-            slot: slot,
-            status: 'available',
-            pickedBy: null
-        }));
+        // ★ 인원수 초과해서 빈 칩이 생기지 않도록 정확한 개수만 생성
+        const chipsToMake = Math.min(perColor, total - (i * perColor));
+        
+        for (let j = 0; j < chipsToMake; j++) {
+            casinoObj[colorName + 'Chips'].push({
+                id: `c_${i}_${j}`,
+                color: colorName,
+                slot: laneBag[j],
+                status: 'available',
+                pickedBy: null // 빈 칩
+            });
+        }
     }
+    // DB에 덮어쓰기
     db.ref('bowling_v14/casino').set(casinoObj);
+};
+
+// 2. 칩 클릭 시 (등급 안 맞으면 경고창 + 차단)
+window.pickChip = function(color, chipId) {
+    const myName = window.currentUserName;
+    const participantNames = Array.isArray(attendees) ? attendees : [];
+    
+    // 실시간 에버순 정렬
+    const sortedUsers = participantNames.map(name => {
+        const m = members.find(mem => mem.name === name);
+        return { name: name, avg: m ? (parseInt(m.avg) || 0) : 0 };
+    }).sort((a, b) => b.avg - a.avg);
+
+    // 내 순위 및 등급 색상 계산
+    const myRankIdx = sortedUsers.findIndex(u => u.name === myName);
+    if (myRankIdx === -1) return alert("참석자 명단에 없습니다.");
+
+    const lanesCount = selectedBlocks.length || 2;
+    const perColor = Math.ceil(participantNames.length / lanesCount);
+    
+    const colorKeys = ['red', 'blue', 'green', 'yellow', 'purple'];
+    const myRequiredColor = colorKeys[Math.floor(myRankIdx / perColor)];
+
+    // [원칙 2] 입구 컷 (내 등급 색깔이 아니면 무조건 차단)
+    if (color !== myRequiredColor) {
+        alert(`[선택 불가] 당신의 실력 등급은 ${myRequiredColor.toUpperCase()}칩 입니다!`);
+        return; 
+    }
+
+    // 조건 통과 시에만 내 이름 등록
+    db.ref(`bowling_v14/casino/${color}Chips/${chipId}`).update({
+        pickedBy: myName,
+        status: 'picked'
+    });
 };
 
 // [등급 제한 클릭 로직 - 위와 동일]
