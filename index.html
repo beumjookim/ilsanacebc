@@ -3019,67 +3019,7 @@ window.getWeightedStats = function(name) {
     const avg = gameCount > 0 ? Math.round(totalScore / gameCount) : 0;
     return { weightedAvg: avg, simpleAvg12: avg };
 };
-/* ============================================================
-   🎰 [카지노 엔진] 이중 셔플 및 권한 제어 시스템
-   ============================================================ */
 
-// 1. 카지노 판 초기화 (이중 셔플 핵심)
-/* ============================================================
-   🎰 [카지노 엔진] 수정본 (객체 구조 및 이름 배열 대응)
-   ============================================================ */
-// 2. [칩 생성 엔진] (사용자님의 2색 규칙 + 그룹화 구조 적용)
-// 1. 카지노 판 깔기 (등급별 빈 칩 생성)
-// 1. 카지노 판 생성: 선택한 레인(팀) 수만큼만 색깔 생성
-// 1. 카지노 판 생성: 선택한 레인(팀) 수만큼만 색깔 생성
-// 1. 카지노 생성 (팀 수 = 색깔 수, 빈 배열 초기화 필수)
-// 1. 카지노 판 깔기 (배정된 레인 수만큼 색깔 생성)
-// 1. 카지노 판 깔기 (진짜 배정된 레인 수 + 인원수 연동)
-window.initCasino = function() {
-    const participants = Array.isArray(attendees) ? attendees.filter(n => n && !n.includes("고스트")) : [];
-    if (participants.length === 0) return alert("참석자가 없습니다.");
-
-    // [수정 1] 관리자가 조편성 화면에서 배정한 진짜 '레인(팀)' 정보 가져오기
-    let activeLanes = [];
-    for (let l = 1; l <= 20; l++) {
-        let t = parseInt(laneSettings['team_' + l]) || 0;
-        if (t > 0) activeLanes.push({ lane: l, team: t });
-    }
-    if (activeLanes.length === 0) return alert("레인(팀) 배정 정보가 없습니다. 조편성을 먼저 확인하세요.");
-
-    // 팀의 개수 = 색깔(등급)의 개수
-    const uniqueTeams = [...new Set(activeLanes.map(al => al.team))];
-    const lanesCount = uniqueTeams.length; 
-    const colorKeys = ['red', 'blue', 'green', 'yellow', 'purple'];
-
-    const casinoObj = { 
-        redChips: [], blueChips: [], greenChips: [], yellowChips: [], purpleChips: [],
-        status: 'ready', mode: window.currentCasinoMode || 'team', timestamp: Date.now() 
-    };
-
-    const perColor = Math.ceil(participants.length / lanesCount);
-
-    for (let i = 0; i < lanesCount; i++) {
-        const colorName = colorKeys[i];
-        
-        let laneBag = [];
-        for (let n = 0; n < perColor; n++) {
-            laneBag.push(activeLanes[n % activeLanes.length]);
-        }
-        laneBag = laneBag.sort(() => Math.random() - 0.5); // 레인 섞기
-
-        const chipsToMake = Math.min(perColor, participants.length - (i * perColor));
-        for (let j = 0; j < chipsToMake; j++) {
-            casinoObj[colorName + 'Chips'].push({
-                id: `c_${i}_${j}`,
-                color: colorName,
-                slot: laneBag[j], // 뒷면에 배정된 팀/레인 숨기기
-                status: 'available',
-                pickedBy: null
-            });
-        }
-    }
-    db.ref('bowling_v14/casino').set(casinoObj);
-};
 // 2. 칩 클릭 (입구 컷 및 에버순 정렬)
 window.pickCasinoChip = function(chipId, color) {
     const myName = (loggedInUser || "").trim();
