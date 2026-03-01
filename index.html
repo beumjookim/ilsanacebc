@@ -3030,19 +3030,20 @@ window.getWeightedStats = function(name) {
    ============================================================ */
 // 2. [칩 생성 엔진] (사용자님의 2색 규칙 + 그룹화 구조 적용)
 window.initCasino = function() {
-    const participants = Array.isArray(attendees) ? attendees : [];
-    if (participants.length === 0) return alert("참석자가 없습니다.");
+    // 1. 기억장소(attendees)에서 참석자 명단 확보
+    const participantNames = Array.isArray(attendees) ? attendees : [];
+    if (participantNames.length === 0) return alert("참석자가 없습니다.");
 
-    // 1. [철저한 분석] members 배열에서 에버를 정확히 찾아 실력순 정렬
-    const sortedUsers = participants.map(name => {
+    // 2. [원칙 1] 기억장소(members)의 데이터를 참조하여 실력순 정렬
+    const sortedUsers = participantNames.map(name => {
         const m = members.find(mem => mem.name === name);
-        return { name: name, avg: m ? (parseInt(m.handicap || 0) + (parseInt(m.avg) || 0)) : 0 };
+        return { name: name, avg: m ? (parseInt(m.avg) || 0) : 0 };
     }).sort((a, b) => b.avg - a.avg);
 
-    const isTeamMode = (window.currentCasinoMode === 'team');
     const total = sortedUsers.length;
+    const isTeamMode = (window.currentCasinoMode === 'team');
     
-    // 사용자님이 원하신 구조: 팀전은 딱 2가지 색상만 사용
+    // 카지노 객체 초기화
     const casinoObj = {
         redChips: [], blueChips: [], greenChips: [],
         yellowChips: [], purpleChips: [],
@@ -3050,31 +3051,44 @@ window.initCasino = function() {
     };
 
     if (isTeamMode) {
-        // [원칙 준수] 2팀전 = 2개 분류 (상위 절반 빨강 / 하위 절반 파랑)
-        const half = Math.ceil(total / 2);
-        let labels = [];
-        selectedBlocks.forEach(lane => {
-            labels.push({ lane: lane, team: 'A' }, { lane: lane, team: 'B' });
-        });
-        while(labels.length < total) labels.push({ lane: selectedBlocks[0], team: 'A' });
-        labels = labels.sort(() => Math.random() - 0.5);
+        // [원칙 2] 팀전 배정 - 레인당 인원수에 맞게 그룹(색상) 나누기
+        // 12명 3인조면 3색(빨,파,초), 4명 2인조면 2색(빨,파) 자동 결정
+        const lanes = selectedBlocks.sort((a, b) => a - b);
+        const membersPerLane = Math.ceil(total / lanes.length);
+        const colorKeys = ['redChips', 'blueChips', 'greenChips', 'yellowChips', 'purpleChips'];
 
-        sortedUsers.forEach((user, idx) => {
-            // 1등부터 1/2까지는 무조건 빨강, 나머지는 무조건 파랑
-            const colorGroup = (idx < half) ? 'redChips' : 'blueChips';
-            const colorName = (idx < half) ? 'red' : 'blue';
-            const label = labels.pop();
-
-            casinoObj[colorGroup].push({
-                id: 'c_' + idx,
-                color: colorName,
-                slot: label,
-                status: 'available',
-                pickedBy: null
+        for (let i = 0; i < membersPerLane; i++) {
+            const colorKey = colorKeys[i];
+            const colorName = colorKey.replace('Chips', '');
+            
+            // ★ 핵심: 각 색상 등급마다 1번부터 마지막 레인까지 쪽지를 새로 준비
+            let laneBag = [];
+            lanes.forEach(l => {
+                // 팀전이므로 각 레인에 A, B팀이 대결하는 구조라면 두 번 넣기
+                laneBag.push({ lane: l, team: 'A' });
+                // 만약 레인당 1팀씩 찢어지는 4명 2팀전이라면 여기서 한 번만 들어감
+                // (현재 사용자님의 레인 설정 로직에 맞춰 유동적으로 작동)
             });
-        });
+
+            // 주머니 섞기 (이걸 해야 고수끼리 레인이 찢어집니다)
+            laneBag = laneBag.sort(() => Math.random() - 0.5);
+
+            // 해당 실력 등급의 인원에게 칩 부여
+            for (let j = 0; j < lanes.length; j++) {
+                const userIdx = (i * lanes.length) + j;
+                if (userIdx < total) {
+                    casinoObj[colorKey].push({
+                        id: 'c_' + i + '_' + j,
+                        color: colorName,
+                        slot: laneBag[j] || { lane: lanes[0], team: 'A' },
+                        status: 'available',
+                        pickedBy: null
+                    });
+                }
+            }
+        }
     } else {
-        // 개인전은 기존 5색 유지
+        // 개인전은 에버 구간별 5색 배정 (기존 로직 유지)
         const colors = ['red', 'blue', 'green', 'yellow', 'purple'];
         const groupSize = Math.ceil(total / 5);
         sortedUsers.forEach((user, idx) => {
@@ -3088,6 +3102,7 @@ window.initCasino = function() {
         });
     }
 
+    // 3. Firebase 저장
     db.ref('bowling_v14/casino').set(casinoObj);
 };
 
