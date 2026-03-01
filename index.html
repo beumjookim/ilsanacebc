@@ -3036,26 +3036,30 @@ window.initCasino = function() {
     const participants = Array.isArray(attendees) ? attendees : [];
     const lanes = (Array.isArray(selectedBlocks) && selectedBlocks.length > 0) ? selectedBlocks : [1, 2];
     
-    // [원칙 1] 팀 수 = 색깔 수 (2팀이면 2색, 3팀이면 3색)
+    if (participants.length === 0) return alert("참석자가 없습니다.");
+
+    // [원칙 1] 팀 수 = 색깔 수 (2팀이면 2색)
     const colorCount = lanes.length; 
-    const colorKeys = ['redChips', 'blueChips', 'greenChips', 'yellowChips', 'purpleChips'];
+    const colorKeys = ['red', 'blue', 'green', 'yellow', 'purple']; // 칩 이름 접두어
     const casinoObj = { status: 'ready', mode: window.currentCasinoMode, timestamp: Date.now() };
 
-    // 한 등급당 인원 계산
+    // 등급당 인원 계산 (예: 4명 2팀이면 등급당 2명)
     const perColor = Math.ceil(participants.length / colorCount);
 
     for (let i = 0; i < colorCount; i++) {
-        const colorKey = colorKeys[i];
+        const colorName = colorKeys[i]; // 여기서 i에 따라 red, blue, green...이 결정됨
+        const colorKey = colorName + 'Chips'; // redChips, blueChips...
+        
         let laneBag = [];
-        // 각 등급 주머니에 레인 번호를 공평하게 배분
         for (let n = 0; n < perColor; n++) {
             laneBag.push({ lane: lanes[n % lanes.length], team: 'A' });
         }
         laneBag = laneBag.sort(() => Math.random() - 0.5); // 레인 섞기
 
+        // 생성되는 칩에 각 등급의 색상을 정확히 주입
         casinoObj[colorKey] = laneBag.map((slot, j) => ({
             id: `c_${i}_${j}`,
-            color: colorKey.replace('Chips', ''),
+            color: colorName, // 이 부분이 red, blue 등으로 바뀌어야 합니다!
             slot: slot,
             status: 'available',
             pickedBy: null
@@ -3064,33 +3068,28 @@ window.initCasino = function() {
     db.ref('bowling_v14/casino').set(casinoObj);
 };
 
-// 2. 칩 클릭: 내 등급이 아닌 색을 누르면 "안 된다"고 경고창 띄움
+// [등급 제한 클릭 로직 - 위와 동일]
 window.pickChip = function(color, chipId) {
     const myName = window.currentUserName;
     const participantNames = Array.isArray(attendees) ? attendees : [];
     
-    // [에버순 정렬]
     const sortedUsers = participantNames.map(name => {
         const m = members.find(mem => mem.name === name);
         return { name: name, avg: m ? (parseInt(m.avg) || 0) : 0 };
     }).sort((a, b) => b.avg - a.avg);
 
-    // 내 실력 순위(index) 확인
     const myRankIdx = sortedUsers.findIndex(u => u.name === myName);
     const lanesCount = selectedBlocks.length;
     
-    // [원칙 2] 내 순위에 맞는 색깔 계산 (순위 / 팀당인원)
     const colorKeys = ['red', 'blue', 'green', 'yellow', 'purple'];
     const myGroupIdx = Math.floor(myRankIdx / Math.ceil(participantNames.length / lanesCount));
     const myRequiredColor = colorKeys[myGroupIdx];
 
-    // 등급이 다르면 경고창 띄우고 중단
     if (color !== myRequiredColor) {
-        alert(`당신의 등급은 [${myRequiredColor.toUpperCase()}]입니다. 다른 색은 뽑을 수 없습니다!`);
+        alert(`당신은 [${myRequiredColor.toUpperCase()}] 등급입니다. 다른 색은 뽑을 수 없습니다!`);
         return; 
     }
 
-    // 등급이 맞을 때만 DB 업데이트
     db.ref(`bowling_v14/casino/${color}Chips/${chipId}`).update({
         pickedBy: myName,
         status: 'picked'
