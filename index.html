@@ -3030,20 +3030,19 @@ window.getWeightedStats = function(name) {
    ============================================================ */
 // 2. [칩 생성 엔진] (사용자님의 2색 규칙 + 그룹화 구조 적용)
 window.initCasino = function() {
-    // attendees가 배열인 경우를 대비한 처리
-    const participantNames = Array.isArray(attendees) ? attendees : Object.keys(attendees || {});
-    if (participantNames.length === 0) return alert("참석자가 없습니다.");
+    const participants = Array.isArray(attendees) ? attendees : [];
+    if (participants.length === 0) return alert("참석자가 없습니다.");
 
-    // 실력순 정렬 (members 배열에서 이름 매칭하여 에버 추출)
-    const sortedUsers = participantNames.map(name => {
+    // 1. [철저한 분석] members 배열에서 에버를 정확히 찾아 실력순 정렬
+    const sortedUsers = participants.map(name => {
         const m = members.find(mem => mem.name === name);
-        return { name: name, avg: m ? (m.avg || 0) : 0 };
+        return { name: name, avg: m ? (parseInt(m.handicap || 0) + (parseInt(m.avg) || 0)) : 0 };
     }).sort((a, b) => b.avg - a.avg);
 
     const isTeamMode = (window.currentCasinoMode === 'team');
     const total = sortedUsers.length;
     
-    // 색상별 바구니 준비 (renderCasino가 기대하는 구조)
+    // 사용자님이 원하신 구조: 팀전은 딱 2가지 색상만 사용
     const casinoObj = {
         redChips: [], blueChips: [], greenChips: [],
         yellowChips: [], purpleChips: [],
@@ -3051,26 +3050,31 @@ window.initCasino = function() {
     };
 
     if (isTeamMode) {
-        // [팀전] 2색 분류 (상위 빨강, 하위 파랑)
+        // [원칙 준수] 2팀전 = 2개 분류 (상위 절반 빨강 / 하위 절반 파랑)
         const half = Math.ceil(total / 2);
         let labels = [];
         selectedBlocks.forEach(lane => {
             labels.push({ lane: lane, team: 'A' }, { lane: lane, team: 'B' });
         });
-        // 인원수에 맞게 라벨 복제 및 셔플
         while(labels.length < total) labels.push({ lane: selectedBlocks[0], team: 'A' });
         labels = labels.sort(() => Math.random() - 0.5);
 
         sortedUsers.forEach((user, idx) => {
-            const colorKey = (idx < half) ? 'redChips' : 'blueChips';
+            // 1등부터 1/2까지는 무조건 빨강, 나머지는 무조건 파랑
+            const colorGroup = (idx < half) ? 'redChips' : 'blueChips';
+            const colorName = (idx < half) ? 'red' : 'blue';
             const label = labels.pop();
-            casinoObj[colorKey].push({
-                id: 'c_' + idx, color: (idx < half ? 'red' : 'blue'),
-                slot: label, status: 'available', pickedBy: null
+
+            casinoObj[colorGroup].push({
+                id: 'c_' + idx,
+                color: colorName,
+                slot: label,
+                status: 'available',
+                pickedBy: null
             });
         });
     } else {
-        // [개인전] 5색 분류
+        // 개인전은 기존 5색 유지
         const colors = ['red', 'blue', 'green', 'yellow', 'purple'];
         const groupSize = Math.ceil(total / 5);
         sortedUsers.forEach((user, idx) => {
@@ -3084,7 +3088,6 @@ window.initCasino = function() {
         });
     }
 
-    // Firebase에 계층 구조로 저장
     db.ref('bowling_v14/casino').set(casinoObj);
 };
 
