@@ -460,22 +460,30 @@
 
             <div id="groupPanel" class="panel">
     <div class="input-box">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
             <h3 id="modeDisplay" style="margin:0; font-size:1.1rem; color:var(--primary);">⚖️ 정기모임 (4게임)</h3>
             <button class="btn-sm" onclick="window.toggleMode()" style="background:var(--dark); color:white;">🔄 모드 전환</button>
         </div>
-        
-<div style="margin-top:20px; padding:15px; border-top:2px dashed #eee; text-align:center; background:#fff;">
-    <div style="margin-bottom:12px; font-weight:bold; color:var(--dark);">🎰 카지노 게임 모드 선택</div>
-    
-    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-        <button id="btnTeamMode" class="universal-btn" style="background:var(--accent); flex:1; margin-bottom:0;" onclick="window.setGameMode('team')">👥 팀전 시작</button>
-        <button id="btnSoloMode" class="universal-btn" style="background:#ccc; flex:1; margin-bottom:0;" onclick="window.setGameMode('individual')">⚡ 개인전 시작</button>
+
+        <div id="regularSection" style="display:none; gap:6px; margin-top:10px;">
+            <button type="button" onclick="window.runGeneralAssignment()" 
+                    style="flex:2; height:45px; background:#3498db; color:white; border:none; border-radius:8px; font-weight:bold;">⚖️ 일반 배정 시작</button>
+            <button type="button" onclick="window.resetAssignment()" 
+                    style="flex:1; height:45px; background:white; border:1px solid #c0392b; color:#c0392b; border-radius:8px; font-weight:bold;">🗑️ 초기화</button>
+        </div>
+
+        <div id="casinoSection" style="display:none; text-align:center; margin-top:10px; padding-top:15px; border-top:1px solid #eee;">
+            <div style="margin-bottom:12px; font-weight:bold; color:var(--dark);">🎰 카지노 게임</div>
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <button id="btnTeamMode" class="universal-btn" style="background:var(--accent); flex:1; margin-bottom:0;" onclick="window.setGameMode('team')">👥 팀전</button>
+                <button id="btnSoloMode" class="universal-btn" style="background:#ccc; flex:1; margin-bottom:0;" onclick="window.setGameMode('individual')">👤 개인전</button>
+            </div>
+            <button class="universal-btn" style="background:var(--warning); color:#000; font-size:1.1rem;" onclick="window.initCasinoFromSetup()">🚀 게임 시작</button>
+            <button class="universal-btn" style="background:white; border:1px solid #c0392b; color:#c0392b; margin-top:10px; font-size:0.9rem;" onclick="window.resetAssignment()">🗑️ 초기화</button>
+        </div>
     </div>
-    
-    <button class="universal-btn" style="background:var(--warning); color:#000; font-size:1.1rem; box-shadow: 0 4px 10px rgba(0,0,0,0.1);" onclick="window.initCasinoFromSetup()">🎲 이 모드로 카지노판 깔기</button>
-</div>
-        <div id="assignGameTabs" class="rank-tabs" style="margin: 15px 0;"></div>
+
+    <div id="assignGameTabs" class="rank-tabs" style="margin: 15px 0;"></div>
 
         <label style="font-weight:bold; color:var(--warning); display:block; margin-bottom:5px;">1. 구역 선택 (레인 구조)</label>
         <div style="display:flex; gap:5px; margin-bottom:15px;">
