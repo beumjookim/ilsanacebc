@@ -2150,7 +2150,56 @@ window.getMyTier = function() {
 };
 
 // 카지노 종료 후 -> 공식 팀 확정 -> 점수 입력창 직행
+// 3. 카지노 종료 및 입력창 직행 (에러 원인 해결 완벽 수리)
 window.finishCasino = function() {
+    if (!isAdmin) return alert("관리자만 종료할 수 있습니다.");
+    if (!confirm("카지노 배정을 종료하고 '점수 입력창'으로 바로 이동할까요?")) return;
+    if (!window.casino) return alert("카지노 데이터가 없습니다.");
+
+    const allChips = [
+        ...(window.casino.redChips || []), ...(window.casino.blueChips || []),
+        ...(window.casino.greenChips || []), ...(window.casino.yellowChips || []),
+        ...(window.casino.purpleChips || [])
+    ];
+
+    let finalTeamsMap = {}; 
+    
+    allChips.forEach(chip => {
+        const laneNo = chip.slot.lane; 
+        const teamNo = chip.slot.teamNo; // ★ 이제 에러 없이 팀 번호를 정확히 읽어옵니다!
+
+        if (!finalTeamsMap[teamNo]) {
+            finalTeamsMap[teamNo] = { teamNo: teamNo, members: [], totalAvg: 0 };
+        }
+
+        if (chip.pickedBy) {
+            const stats = window.getWeightedStats(chip.pickedBy);
+            const avg = stats.weightedAvg || 0;
+            finalTeamsMap[teamNo].members.push({ name: chip.pickedBy, lane: laneNo, avg: avg, score: 0 });
+            finalTeamsMap[teamNo].totalAvg += avg;
+        } else {
+            // 빈 자리는 고스트로 채움
+            finalTeamsMap[teamNo].members.push({ name: "👻고스트", lane: laneNo, avg: 0, score: 0, isGhost: true });
+        }
+    });
+
+    let finalTeams = Object.values(finalTeamsMap).sort((a,b) => a.teamNo - b.teamNo);
+    const maxAvg = Math.max(...finalTeams.map(t => t.totalAvg), 0);
+    finalTeams.forEach(t => t.matchHandy = Math.max(0, Math.round(maxAvg - t.totalAvg)));
+
+    const updates = {};
+    updates[`bowling_v14/gameTeams/${currentTargetGame}`] = finalTeams; 
+    updates['bowling_v14/casino/status'] = 'finished'; 
+    updates['bowling_v14/settings/currentTab'] = 'inputPanel'; 
+    updates['bowling_v14/settings/currentInputGame'] = currentTargetGame; 
+
+    db.ref().update(updates).then(() => {
+        alert("✅ 배정 완료! 점수 입력창으로 바로 이동합니다.");
+        window.showPanel('inputPanel', document.querySelectorAll('.tab-btn')[4]);
+    }).catch(err => {
+        alert("저장 실패: " + err.message);
+    });
+};
     if (!isAdmin) return alert("관리자만 종료할 수 있습니다.");
     if (!confirm("카지노 배정을 종료하고 '점수 입력창'으로 바로 이동할까요?")) return;
 
@@ -3091,69 +3140,52 @@ window.initCasino = function() {
     }
     db.ref('bowling_v14/casino').set(casinoObj);
 };
+// 2. 칩 클릭 (입구 컷 및 에버순 정렬)
+window.pickCasinoChip = function(chipId, color) {
+    const myName = (loggedInUser || "").trim();
+    if (!myName) return alert("로그인이 필요합니다.");
 
-// 2. 칩 클릭 (에버순 정렬 & 입구 컷)
-window.pickChip = function(color, chipId) {
-    const myName = window.currentUserName;
-    const participants = Array.isArray(attendees) ? attendees : [];
-    
-    // ★ [핵심 3] 기억장소(members) 참조하여 에버순 내림차순 정렬
+    if (!window.casino) return;
+    const allChips = [
+        ...(window.casino.redChips || []), ...(window.casino.blueChips || []),
+        ...(window.casino.greenChips || []), ...(window.casino.yellowChips || []),
+        ...(window.casino.purpleChips || [])
+    ];
+    if (allChips.some(c => c.pickedBy === myName)) return alert("이미 칩을 뽑으셨습니다!");
+
+    const participants = Array.isArray(attendees) ? attendees.filter(n => n && !n.includes("고스트")) : [];
     const sortedUsers = participants.map(name => {
-        const m = members.find(mem => mem.name === name);
-        return { name: name, avg: m ? (parseInt(m.avg) || 0) : 0 };
+        const stats = window.getWeightedStats(name);
+        return { name: name, avg: stats.weightedAvg || 0 }; 
     }).sort((a, b) => b.avg - a.avg);
 
-    // 내 순위 찾기
     const myRankIdx = sortedUsers.findIndex(u => u.name === myName);
-    if (myRankIdx === -1) return;
+    if (myRankIdx === -1) return alert("참석자 명단에 없습니다.");
 
-    // ★ [핵심 4] 내 등급에 맞는 색깔 계산
-    const actualLanes = [3, 4]; // initCasino와 동일한 레인 배열 사용
-    const lanesCount = actualLanes.length;
+    // 실제 팀 수 기준으로 내 등급 계산
+    let countedTeams = [];
+    for (let l = 1; l <= 20; l++) {
+        let t = parseInt(laneSettings['team_' + l]) || 0;
+        if (t > 0 && !countedTeams.includes(t)) countedTeams.push(t);
+    }
+    const lanesCount = countedTeams.length || 2;
     const perColor = Math.ceil(participants.length / lanesCount);
     
     const colorKeys = ['red', 'blue', 'green', 'yellow', 'purple'];
     const myRequiredColor = colorKeys[Math.floor(myRankIdx / perColor)];
 
-    // ★ [핵심 5] 다른 등급 칩 클릭 시 경고창 띄우고 완벽 차단
     if (color !== myRequiredColor) {
-        alert(`잘못 선택했습니다! 당신의 실력 등급은 [${myRequiredColor.toUpperCase()}] 색상입니다. 다른 색의 칩을 선택해주세요.`);
+        alert(`🚨 [잘못된 선택] 당신의 실력 등급은 [${myRequiredColor.toUpperCase()}] 칩입니다!`);
         return; 
     }
 
-    // 조건 통과 시에만 Firebase에 내 이름 새기기 (배정 완료)
-    db.ref(`bowling_v14/casino/${color}Chips/${chipId}`).update({
-        pickedBy: myName,
-        status: 'picked'
-    });
-};
+    const chipKey = `${color}Chips`;
+    const chipIdx = window.casino[chipKey].findIndex(c => c.id === chipId);
 
-// [등급 제한 클릭 로직 - 위와 동일]
-window.pickChip = function(color, chipId) {
-    const myName = window.currentUserName;
-    const participantNames = Array.isArray(attendees) ? attendees : [];
-    
-    const sortedUsers = participantNames.map(name => {
-        const m = members.find(mem => mem.name === name);
-        return { name: name, avg: m ? (parseInt(m.avg) || 0) : 0 };
-    }).sort((a, b) => b.avg - a.avg);
-
-    const myRankIdx = sortedUsers.findIndex(u => u.name === myName);
-    const lanesCount = selectedBlocks.length;
-    
-    const colorKeys = ['red', 'blue', 'green', 'yellow', 'purple'];
-    const myGroupIdx = Math.floor(myRankIdx / Math.ceil(participantNames.length / lanesCount));
-    const myRequiredColor = colorKeys[myGroupIdx];
-
-    if (color !== myRequiredColor) {
-        alert(`당신은 [${myRequiredColor.toUpperCase()}] 등급입니다. 다른 색은 뽑을 수 없습니다!`);
-        return; 
+    if (chipIdx > -1) {
+        db.ref(`bowling_v14/casino/${chipKey}/${chipIdx}/pickedBy`).set(myName);
+        db.ref(`bowling_v14/casino/pickedCount`).transaction(count => (count || 0) + 1);
     }
-
-    db.ref(`bowling_v14/casino/${color}Chips/${chipId}`).update({
-        pickedBy: myName,
-        status: 'picked'
-    });
 };
 
 // 💡 보조 함수: 이름으로 등급(티어)을 실시간 계산
@@ -3231,20 +3263,51 @@ window.setGameMode = function(mode) {
 };
 
 // 1. [카지노 시작] 버튼 연동 (이동 + 생성)
-window.initCasinoFromSetup = function() {
-    if (!isAdmin) return alert("관리자 권한이 필요합니다.");
-    
-    // 모드 기본값 설정
-    if (!window.currentCasinoMode) window.currentCasinoMode = 'team';
+// 1. 카지노 생성 (팀 번호 완벽 삽입)
+window.initCasino = function() {
+    const participants = Array.isArray(attendees) ? attendees.filter(n => n && !n.includes("고스트")) : [];
+    if (participants.length === 0) return alert("참석자가 없습니다.");
 
-    // 칩 생성 엔진 실행
-    window.initCasino();
+    // 관리자가 배정한 레인(팀) 정보 가져오기
+    let activeLanes = [];
+    for (let l = 1; l <= 20; l++) {
+        let t = parseInt(laneSettings['team_' + l]) || 0;
+        if (t > 0) activeLanes.push({ lane: l, teamNo: t }); // ★ 여기서 teamNo를 확실히 저장!
+    }
+    if (activeLanes.length === 0) return alert("조편성에서 '팀 번호'를 먼저 입력해주세요.");
 
-    // 즉시 페이지 이동
-    window.showPanel('casinoPanel', document.querySelectorAll('.tab-btn')[2]);
-    
-    // 강제 렌더링 지연 실행
-    setTimeout(() => { if(window.renderCasino) window.renderCasino(); }, 300);
+    const uniqueTeams = [...new Set(activeLanes.map(al => al.teamNo))];
+    const lanesCount = uniqueTeams.length; 
+    const colorKeys = ['red', 'blue', 'green', 'yellow', 'purple'];
+
+    const casinoObj = { 
+        redChips: [], blueChips: [], greenChips: [], yellowChips: [], purpleChips: [],
+        status: 'ready', mode: window.currentCasinoMode || 'team', timestamp: Date.now() 
+    };
+
+    const perColor = Math.ceil(participants.length / lanesCount);
+
+    for (let i = 0; i < lanesCount; i++) {
+        const colorName = colorKeys[i];
+        
+        let laneBag = [];
+        for (let n = 0; n < perColor; n++) {
+            laneBag.push(activeLanes[n % activeLanes.length]);
+        }
+        laneBag = laneBag.sort(() => Math.random() - 0.5); 
+
+        const chipsToMake = Math.min(perColor, participants.length - (i * perColor));
+        for (let j = 0; j < chipsToMake; j++) {
+            casinoObj[colorName + 'Chips'].push({
+                id: `c_${i}_${j}`,
+                color: colorName,
+                slot: laneBag[j], // ★ 뒷면에 레인+팀번호 모두 안전하게 숨김
+                status: 'available',
+                pickedBy: null
+            });
+        }
+    }
+    db.ref('bowling_v14/casino').set(casinoObj);
 };
 window.finishMeetingAndArchive = function() {
     const today = document.getElementById('inputDate').value;
