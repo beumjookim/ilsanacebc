@@ -577,6 +577,20 @@
                         
                         <button class="universal-btn" onclick="window.saveAllScores()" style="background:var(--accent); margin-top:20px;">💾 점수 저장 완료</button>
                     </div>
+                <button class="universal-btn" onclick="window.saveAllScores()" style="background:var(--accent); margin-top:20px;">💾 점수 저장 완료</button>
+
+<div style="margin-top: 40px; padding: 20px; border: 2px dashed #e67e22; border-radius: 12px; background: #fffcf9; text-align: center;">
+    <h4 style="margin-top:0; color:#e67e22;">🏁 오늘 모임 최종 완료</h4>
+    <p style="font-size: 0.85rem; color: #777; margin-bottom: 15px; line-height: 1.4;">
+        모든 게임이 끝났나요?<br>
+        기록을 <b>보관소(Archives)</b>로 옮기고 오늘 판을 비웁니다.
+    </p>
+    <button class="universal-btn" 
+            style="background: #2c3e50; color: white; font-weight: bold; height: 50px; border: none; width: 100%;" 
+            onclick="window.finishMeetingAndArchive()">
+        🚀 기록 보관 및 다음 모임 준비
+    </button>
+</div>
                 </div>
             </div>
 
@@ -3145,7 +3159,45 @@ window.initCasinoFromSetup = function() {
     const casinoTabBtn = document.querySelectorAll('.tab-btn')[2];
     window.showPanel('casinoPanel', casinoTabBtn);
 };
+window.finishMeetingAndArchive = function() {
+    const today = document.getElementById('inputDate').value;
+    if (!today) return alert("날짜가 선택되지 않았습니다.");
 
+    if (!confirm(`${today} 모임 결과를 기록보관소에 저장하고 모든 판을 초기화할까요?\n(저장된 기록은 통계에서 확인 가능합니다)`)) return;
+
+    // 1. 현재 데이터 가져오기 (점수, 팀구성, 설정 등)
+    const archiveData = {
+        date: today,
+        mode: settings.mode,
+        scores: gameScores || {},
+        teams: gameTeams || {},
+        managers: managers || {},
+        timestamp: Date.now()
+    };
+
+    // 2. 기록보관소(archives)에 저장
+    // 날짜를 키값으로 하여 중복 저장을 방지하거나 목록화합니다.
+    const archiveRef = db.ref(`bowling_v14/archives/${today.replace(/-/g, '')}`);
+    
+    archiveRef.set(archiveData).then(() => {
+        // 3. 기록 저장 성공 시 현재 모임 데이터 초기화
+        const updates = {};
+        updates['bowling_v14/gameScores'] = null;      // 점수 초기화
+        updates['bowling_v14/gameTeams'] = null;       // 팀구성 초기화
+        updates['bowling_v14/laneSettings'] = null;    // 레인설정 초기화
+        updates['bowling_v14/casino'] = null;          // 카지노판 초기화
+        updates['bowling_v14/settings/currentAssignGame'] = '1G'; // 1게임으로 리셋
+        updates['bowling_v14/attendance'] = null;      // 참석 명단 초기화 (새 모임 준비)
+
+        return db.ref().update(updates);
+    }).then(() => {
+        alert("📊 기록 보관이 완료되었습니다!\n새로운 모임을 시작할 준비가 되었습니다.");
+        location.reload(); // 화면 갱신하여 클린한 상태로 시작
+    }).catch(err => {
+        console.error(err);
+        alert("기록 저장 중 오류가 발생했습니다.");
+    });
+};
 /* 3. 칩 선택 로직 (보완 완료) */
 window.pickCasinoChip = function(chipId, color) {
     const myName = (loggedInUser || "").trim();
