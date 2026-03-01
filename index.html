@@ -3029,45 +3029,74 @@ window.getWeightedStats = function(name) {
    🎰 [카지노 엔진] 수정본 (객체 구조 및 이름 배열 대응)
    ============================================================ */
 window.initCasino = function() {
-    // 1. 레인 설정값 가져오기
-    let allSlots = [];
-    for (let l = 1; l <= 20; l++) {
-        const count = parseInt(laneSettings['cnt_' + l]) || 0;
-        const teamNo = parseInt(laneSettings['team_' + l]) || 0;
-        if (count > 0 && teamNo > 0) {
-            for (let i = 0; i < count; i++) {
-                allSlots.push({ lane: l, teamNo: teamNo });
+    if (!isAdmin) return alert("관리자만 가능합니다.");
+    
+    // 1. 참석자 명단 가져오기 및 실력순 정렬
+    const participants = Object.keys(attendance || {}).filter(uid => attendance[uid] === true);
+    if (participants.length === 0) return alert("참석자가 없습니다.");
+
+    // 에버(avg) 기준 내림차순 정렬
+    const sortedUsers = participants.map(uid => ({
+        uid: uid,
+        avg: members[uid]?.avg || 0
+    })).sort((a, b) => b.avg - a.avg);
+
+    const total = sortedUsers.length;
+    const isTeamMode = (currentCasinoMode === 'team'); // 현재 선택된 모드 (팀전/개인전)
+    
+    // 2. 분류(색상) 개수 결정: 팀전이면 2분류, 개인전이면 5분류(또는 인원수만큼)
+    const groupCount = isTeamMode ? 2 : Math.min(5, total);
+    const usersPerGroup = Math.floor(total / groupCount);
+    let extra = total % groupCount;
+
+    const chips = [];
+    const colors = ['red', 'blue', 'green', 'yellow', 'purple'];
+    let currentIdx = 0;
+
+    // 3. 그룹별 칩 생성 (레인과 팀 정보 매칭)
+    for (let i = 0; i < groupCount; i++) {
+        const count = usersPerGroup + (extra > 0 ? 1 : 0);
+        extra--;
+
+        // 해당 그룹(색상)의 팀 정보(칩 뒷면) 생성
+        // 예: 1L-A, 1L-B, 2L-A, 2L-B ...
+        let groupLabels = [];
+        selectedBlocks.forEach(lane => {
+            if (isTeamMode) {
+                groupLabels.push({ lane: lane, team: 'A' });
+                groupLabels.push({ lane: lane, team: 'B' });
+            } else {
+                // 개인전일 경우 레인 번호만 (레인당 4개씩 등)
+                for(let k=0; k<4; k++) groupLabels.push({ lane: lane, team: String.fromCharCode(65 + k) });
+            }
+        });
+
+        // 필요한 만큼만 셔플해서 할당
+        groupLabels = groupLabels.sort(() => Math.random() - 0.5);
+
+        for (let j = 0; j < count; j++) {
+            if (currentIdx < total) {
+                const label = groupLabels[j] || { lane: selectedBlocks[0], team: 'A' };
+                chips.push({
+                    id: 'chip_' + Date.now() + '_' + currentIdx,
+                    color: colors[i],
+                    lane: label.lane,
+                    team: label.team,
+                    status: 'available'
+                });
+                currentIdx++;
             }
         }
     }
 
-    if (allSlots.length === 0) return alert("❌ [조편성]에서 레인과 팀 번호를 먼저 설정해주세요!");
+    // 4. Firebase 저장
+    const updates = {};
+    updates['bowling_v14/casino/chips'] = chips.sort(() => Math.random() - 0.5); // 칩 순서 전체 셔플
+    updates['bowling_v14/casino/status'] = 'ready';
+    updates['bowling_v14/casino/results'] = null; // 이전 결과 초기화
 
-    // 🌀 [이중 셔플 - 1단계] 레인 자리 자체를 무작위로 마구 섞음 (배후의 섞기)
-    allSlots.sort(() => Math.random() - 0.5);
-
-    // 2. 등급별 인원 파악 및 칩 생성
-    const createChips = (color) => {
-        // 해당 등급의 사람 수만큼 칩 생성 (자리 배분)
-        let groupCount = attendees.filter(n => window.calculateTierByName(n) === color).length;
-        if (settings.mode === 'individual') groupCount = (color === 'red') ? attendees.length : 0;
-
-        return Array.from({length: groupCount}, (_, i) => ({
-            id: `${color}_${i}`,
-            color: color,
-            slot: allSlots.pop() || {lane: '?', teamNo: 0}, // 섞인 자리를 칩 뒤에 숨김
-            pickedBy: null
-        }));
-    };
-
-    const casinoData = {
-        redChips: createChips('red'), blueChips: createChips('blue'),
-        greenChips: createChips('green'), yellowChips: createChips('yellow'),
-        purpleChips: createChips('purple'), status: 'ongoing'
-    };
-
-    db.ref('bowling_v14/casino').set(casinoData).then(() => {
-        alert("🎰 이중 셔플 완료! 이제 카지노 탭에서 본인 등급의 칩을 뽑으세요.");
+    db.ref().update(updates).then(() => {
+        alert(`${isTeamMode ? '팀전(2색)' : '개인전'} 카지노판이 준비되었습니다!`);
     });
 };
 
