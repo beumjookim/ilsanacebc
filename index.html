@@ -332,7 +332,8 @@
 .redChips .chip-front { background: radial-gradient(#ff4d4d, #b30000); }
 .blueChips .chip-front { background: radial-gradient(#4d94ff, #0044cc); }
 .yellowChips .chip-front { background: radial-gradient(#ffd633, #b38f00); }
-
+.greenChips .chip-front { background: radial-gradient(#5cd65c, #1e7b1e); }
+.purpleChips .chip-front { background: radial-gradient(#a29bfe, #6c5ce7); }
 .chip-back {
     background: #2c3e50;
     color: white;
@@ -859,22 +860,31 @@ window.enterApp = function() {
     if(typeof window.showGlobalLogin === 'function') window.showGlobalLogin();
 };
 
-window.showGlobalLogin = function() {
-    if(localStorage.getItem('loggedInUser')) {
-        document.getElementById('landingPage').style.display = 'none';
-        document.getElementById('globalLoginScreen').style.display = 'none';
-        document.getElementById('mainContainer').style.display = 'block';
-        window.updateUI();
+/* ============================================================
+   🚀 [통합 엔진] 앱 시작 및 화면 전환 로직 (최종 수정본)
+   ============================================================ */
 
+// 1. 앱 진입 및 로그인 처리
+window.showGlobalLogin = function() {
+    const landing = document.getElementById('landingPage');
+    const loginScreen = document.getElementById('globalLoginScreen');
+    const mainCont = document.getElementById('mainContainer');
+
+    if (localStorage.getItem('loggedInUser')) {
+        if(landing) landing.style.display = 'none';
+        if(loginScreen) loginScreen.style.display = 'none';
+        if(mainCont) mainCont.style.display = 'block';
+        
+        window.updateUI();
         const firstTabBtn = document.querySelectorAll('.tab-btn')[0];
         window.showPanel('attendPanel', firstTabBtn);
-        
     } else {
-        document.getElementById('landingPage').style.display = 'none';
-        document.getElementById('globalLoginScreen').style.display = 'flex';
+        if(landing) landing.style.display = 'none';
+        if(loginScreen) loginScreen.style.display = 'flex';
     }
 };
 
+// 2. 로그인 실행
 window.doGlobalLogin = function() {
     const i = document.getElementById('globalId').value.trim();
     const p = document.getElementById('globalPw').value.trim();
@@ -891,6 +901,48 @@ window.doGlobalLogin = function() {
         } else { alert("로그인 실패! 이름과 비밀번호를 확인하세요."); }
     }
 };
+
+// 3. 통합 패널 전환 (카지노 렌더링 포함)
+window.showPanel = function(id, btn) {
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    const targetPanel = document.getElementById(id);
+    if(targetPanel) targetPanel.classList.add('active');
+    
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    if(btn) btn.classList.add('active');
+
+    if(id !== 'inputPanel') currentInputTeam = null;
+
+    // 데이터 렌더링 연결
+    if(id === 'attendPanel') window.renderAttendanceList();
+    if(id === 'progressPanel') window.renderGameProgress();
+    if(id === 'statsPanel') window.renderAllStats(); 
+    if(id === 'memberPanel') window.renderMembers();
+    if(id === 'archivePanel') window.renderArchiveDates(); // 기록보관소 추가
+
+    if(id === 'groupPanel') {
+        if(typeof window.renderAssignGameTabs === 'function') window.renderAssignGameTabs();
+        if(typeof window.renderCustomLaneConfig === 'function') window.renderCustomLaneConfig();
+        if(typeof window.renderBungaeJangSelect === 'function') window.renderBungaeJangSelect();
+    }
+
+    if(id === 'casinoPanel') {
+        window.renderCasino(); // 카지노 렌더링 실행
+    }
+
+    if(id === 'inputPanel') {
+        if(loggedInUser) {
+            const scoreSec = document.getElementById('scoreSection');
+            if(scoreSec) scoreSec.style.display = 'block';
+            window.renderInputs(); 
+        } else {
+            const scoreSec = document.getElementById('scoreSection');
+            if(scoreSec) scoreSec.style.display = 'none';
+        }
+    }
+};
+
+
 
 window.updateUI = function() {
     if(!loggedInUser) return;
@@ -1227,49 +1279,7 @@ window.changeAssignMethod = function(val) {
     }
 };
 
-window.showPanel = function(id, btn) {
-    // 1. 기존 패널 비활성화 및 선택한 패널 활성화
-    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-    const targetPanel = document.getElementById(id);
-    if(targetPanel) targetPanel.classList.add('active');
-    
-    // 2. 상단 탭 버튼 활성화 상태 변경
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    if(btn) btn.classList.add('active');
 
-    // 3. 입력 패널이 아닐 경우 선택된 팀 초기화 (기존 로직 유지)
-    if(id !== 'inputPanel') currentInputTeam = null;
-
-    // 4. 각 패널별 데이터 렌더링 (기존 로직 유지)
-    if(id === 'attendPanel') window.renderAttendanceList();
-    if(id === 'progressPanel') window.renderGameProgress();
-    if(id === 'statsPanel') window.renderAllStats(); 
-    if(id === 'memberPanel') window.renderMembers();
-
-    // 5. 조편성 패널 전용 렌더링 (기존 로직 유지)
-    if(id === 'groupPanel') {
-        if(typeof window.renderAssignGameTabs === 'function') window.renderAssignGameTabs();
-        if(typeof window.renderCustomLaneConfig === 'function') window.renderCustomLaneConfig();
-        if(typeof window.renderBungaeJangSelect === 'function') window.renderBungaeJangSelect();
-    }
-
-    // 6. ✨ [새로 추가] 카지노 패널 렌더링
-    if(id === 'casinoPanel') {
-        if(typeof window.renderCasino === 'function') window.renderCasino();
-    }
-
-    // 7. 입력 패널 전용 렌더링 (기존 로직 유지)
-    if(id === 'inputPanel') {
-        if(loggedInUser) {
-            const scoreSec = document.getElementById('scoreSection');
-            if(scoreSec) scoreSec.style.display = 'block';
-            window.renderInputs(); 
-        } else {
-            const scoreSec = document.getElementById('scoreSection');
-            if(scoreSec) scoreSec.style.display = 'none';
-        }
-    }
-};
 
 window.goToInput = function(gameNo, teamNo) { 
     currentInputGame = gameNo;
@@ -2121,10 +2131,9 @@ window.getMyTier = function() {
     if(myRank < T) return 'red';               
     if(myRank < T * 2) return 'blue';          
     if(myRank < T * 3) return 'green';         
-    return 'yellow';                           
+    if(myRank < T * 4) return 'yellow';        
+    return 'purple'; // 5번째 티어 안내 추가
 };
-
- 
 
 window.finishCasino = function() {
     const myName = (loggedInUser || "").trim();
@@ -3010,7 +3019,7 @@ window.getWeightedStats = function(name) {
 window.initCasino = function() {
     const isIndividual = (settings.mode === 'individual'); 
     
-    // 1. 레인 슬롯 생성 (객체 형태인 laneSettings를 올바르게 순회)
+    // 1. 레인 슬롯 생성
     let allSlots = [];
     for (let l = 1; l <= 20; l++) {
         const count = parseInt(laneSettings['cnt_' + l]) || 0;
@@ -3025,16 +3034,19 @@ window.initCasino = function() {
     if (allSlots.length === 0) return alert("❌ [2. 조편성]에서 레인별 인원(팀 번호 포함)을 먼저 설정해주세요!");
     if (attendees.length === 0) return alert("❌ 선택된 참석자가 없습니다!");
 
-    // 2. 등급별 인원 분류 (이름 리스트에서 실시간 티어 계산)
-    let redCount = 0, blueCount = 0, greenCount = 0, yellowCount = 0;
+    // 2. 등급별 인원 분류 (purpleCount 추가)
+    let redCount = 0, blueCount = 0, greenCount = 0, yellowCount = 0, purpleCount = 0;
+    
     attendees.forEach(name => {
-        if (isIndividual) { redCount++; } 
-        else {
+        if (isIndividual) { 
+            redCount++; 
+        } else {
             const tier = window.calculateTierByName(name); 
             if (tier === 'red') redCount++;
             else if (tier === 'blue') blueCount++;
             else if (tier === 'green') greenCount++;
-            else yellowCount++;
+            else if (tier === 'yellow') yellowCount++;
+            else purpleCount++; // 5번째 티어: 보라색 카운트
         }
     });
 
@@ -3054,11 +3066,13 @@ window.initCasino = function() {
         }));
     };
 
+    // 5컬러 칩 데이터 생성 (모든 카운트 정상 반영)
     const casinoData = {
         redChips: createChips(redCount, 'red'),
         blueChips: createChips(blueCount, 'blue'),
         greenChips: createChips(greenCount, 'green'),
         yellowChips: createChips(yellowCount, 'yellow'),
+        purpleChips: createChips(purpleCount, 'purple'),
         pickedCount: 0,
         totalCount: attendees.length,
         status: 'ongoing'
@@ -3066,27 +3080,28 @@ window.initCasino = function() {
 
     // 5. Firebase 저장
     db.ref('bowling_v14/casino').set(casinoData).then(() => {
-        alert("🎰 이중 셔플 완료! 카지노 탭에서 칩을 선택하세요.");
+        alert("🎰 5컬러 이중 셔플 완료! 카지노 탭에서 칩을 선택하세요.");
     });
 };
 
 // 💡 보조 함수: 이름으로 등급(티어)을 실시간 계산
 window.calculateTierByName = function(name) {
-    if (!attendees || attendees.length === 0) return 'yellow';
+    if (!attendees || attendees.length === 0) return 'purple'; // 기본값
     const rankingList = attendees.map(n => {
         const s = window.getWeightedStats(n);
         return { name: n, avg: s.weightedAvg || 0 };
     }).sort((a, b) => b.avg - a.avg);
     
     const myRank = rankingList.findIndex(p => p.name === name);
-    const T = Math.ceil(rankingList.length / 4) || 1;
+    const T = Math.ceil(rankingList.length / 5) || 1; // 5분할로 변경
     
     if(myRank < T) return 'red';
     if(myRank < T * 2) return 'blue';
     if(myRank < T * 3) return 'green';
-    return 'yellow';
+    if(myRank < T * 4) return 'yellow';
+    return 'purple'; // 나머지 하위 그룹은 보라색
 };
-
+    
 // 2. 카지노 화면 렌더링 (칩 뒤집기 애니메이션 포함)
 window.renderCasino = function() {
     const area = document.getElementById('casinoArea');
@@ -3129,9 +3144,12 @@ window.renderCasino = function() {
     return groupHtml;
 };
 
-    h += renderGroup(casino.redChips, "빨간 칩 (Ace)", "redChips"); // 색상코드 대신 클래스명 전달
+    // 화면에 5가지 색깔 칩이 모두 나오도록 수정
+h += renderGroup(casino.redChips, "빨간 칩 (Ace)", "redChips");
 h += renderGroup(casino.blueChips, "파란 칩 (Pro)", "blueChips");
+h += renderGroup(casino.greenChips, "초록 칩 (Junior)", "greenChips"); // 복구
 h += renderGroup(casino.yellowChips, "노란 칩 (Senior)", "yellowChips");
+h += renderGroup(casino.purpleChips, "보라 칩 (Special)", "purpleChips"); // 복구
     h += `</div>`;
 
     area.innerHTML = h;
