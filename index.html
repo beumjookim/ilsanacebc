@@ -1519,6 +1519,18 @@ window.renderHistoricalStats = function() {
         return;
     }
 
+    // 🌟 [추가] 엑셀 일련번호(예: 46073)를 예쁜 날짜(YYYY-MM-DD)로 변환하는 마법사
+    const formatExcelDate = (val) => {
+        if (!val) return "";
+        let num = parseInt(val);
+        // 숫자가 30000 이상이고 '-' 기호가 없으면 엑셀 일련번호로 간주
+        if (!isNaN(num) && num > 30000 && !String(val).includes('-')) {
+            const jsDate = new Date((num - 25569) * 86400 * 1000);
+            return jsDate.toISOString().split('T')[0];
+        }
+        return String(val);
+    };
+
     // 1. [클럽 공통 기준선] 장부에 있는 모든 날짜를 중복 없이 추출해서 최신순 정렬
     const allSessionDates = [...new Set(records.map(r => r.date))].sort().reverse();
     
@@ -1532,12 +1544,14 @@ window.renderHistoricalStats = function() {
 
     // 클럽의 최근 N회차 날짜들만 딱 자릅니다. (이게 공통의 '자'입니다)
     const clubWindowDates = (n === 999) ? allSessionDates : allSessionDates.slice(0, n);
-    const oldestDate = clubWindowDates[clubWindowDates.length - 1]; // 가장 오래된 기준 날짜
+    
+    // 🌟 [핵심 수정] 화면에 찍을 때 마법사(formatExcelDate)를 거쳐서 예쁜 날짜로 출력!
+    const oldestDate = formatExcelDate(clubWindowDates[clubWindowDates.length - 1]); 
+    const newestDate = formatExcelDate(allSessionDates[0]);
 
     // 3. [개인별 계산] 모든 회원을 돌면서 '클럽 윈도우' 안에 있는 점수만 합산
     let statsMap = {};
     records.forEach(r => {
-        // 이 기록의 날짜가 클럽의 최근 12회차 안에 포함되는가?
         if (clubWindowDates.includes(r.date) && r.scs) {
             const name = (r.name || "").trim();
             if (!name) return;
@@ -1566,7 +1580,7 @@ window.renderHistoricalStats = function() {
     let html = `
         <div style="margin-bottom:10px; font-size:0.85rem; color:#1565c0; text-align:center; background:#e3f2fd; padding:10px; border-radius:8px; border:1px solid #90caf9;">
             📅 <b>클럽 최근 ${clubWindowDates.length}회차 기준</b><br>
-            <span style="font-size:0.75rem; color:#666;">(${oldestDate} ~ ${allSessionDates[0]})</span>
+            <span style="font-size:0.75rem; color:#666;">(${oldestDate} ~ ${newestDate})</span>
         </div>
         <table class="stats-table">
             <thead><tr><th>순위</th><th>이름</th><th>출석/회차</th><th>게임수</th><th>AVG</th></tr></thead>
@@ -2724,6 +2738,7 @@ window.setJungmoManager = function() {
     }
 };
 // 📊 [진짜 엔진] 엑셀 파일 선택 시 자동으로 데이터를 분석해서 Firebase에 저장
+// 📊 [진짜 엔진] 엑셀 파일 선택 시 자동으로 데이터를 분석해서 Firebase에 저장
 document.getElementById('excelInput').addEventListener('change', function(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -2740,12 +2755,25 @@ document.getElementById('excelInput').addEventListener('change', function(e) {
         const sheetName = workbook.SheetNames[0];
         const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
 
+        // 🌟 [추가] 엑셀 일련번호를 진짜 날짜로 변환하는 필터기
+        const convertExcelDate = (val) => {
+            if (!val) return "";
+            let num = Number(val);
+            if (!isNaN(num) && num > 30000) {
+                const jsDate = new Date((num - 25569) * 86400 * 1000);
+                return jsDate.toISOString().split('T')[0];
+            }
+            return String(val).trim();
+        };
+
         // 1. 날짜 라인 분석 (첫 번째 줄에서 날짜 추출)
         const dateRow = rows[0];
         const dates = [];
         let currentTempDate = "";
         for (let i = 3; i < dateRow.length; i++) {
-            if (dateRow[i]) currentTempDate = dateRow[i]; // 날짜가 적힌 칸 기억
+            if (dateRow[i]) {
+                currentTempDate = convertExcelDate(dateRow[i]); // 🌟 변환기 통과!
+            }
             dates[i] = currentTempDate; // 병합된 칸들도 같은 날짜로 인식
         }
 
