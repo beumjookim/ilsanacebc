@@ -2787,16 +2787,69 @@ document.getElementById('excelInput').addEventListener('change', function(e) {
     reader.readAsArrayBuffer(file);
 });
 // 📂 [기록보관소] 전용 로직
+// 📂 [기록보관소] 전용 로직 (개인 종합 순위 + 게임별 팀 성적)
 window.showArchiveDetail = function(date, type) {
     const history = (type === 'regular') ? window.regularHistoryCache : window.lightningHistoryCache;
     const data = history[date];
     if (!data) return;
 
     const detailArea = document.getElementById('archiveDetailView');
-    let html = `<h4 style="text-align:center; color:#1565c0;">[${date}] ${type==='regular'?'정기모임':'번개'} 결과</h4>`;
+    let html = `<h4 style="text-align:center; color:#2c3e50; margin-bottom: 20px;">[${date}] ${type==='regular'?'⚖️ 정기모임':'⚡ 번개모임'} 결과</h4>`;
 
-    // 해당 날짜의 게임별 팀 성적 그리기
-    const targetTeams = data.gameTeams;
+    const targetTeams = data.gameTeams || {};
+
+    // 🌟 1. [새로운 기능] 개인별 전체 종합 점수 계산
+    let indivMap = {};
+    Object.keys(targetTeams).forEach(gameNo => {
+        targetTeams[gameNo].forEach(t => {
+            t.members.forEach(m => {
+                if(m.name.includes("고스트") || m.isGhost) return; // 고스트는 순위에서 제외
+                if(!indivMap[m.name]) {
+                    indivMap[m.name] = { name: m.name, totalScore: 0, gameCount: 0 };
+                }
+                const s = parseInt(m.score) || 0;
+                if(s > 0) {
+                    indivMap[m.name].totalScore += s;
+                    indivMap[m.name].gameCount += 1;
+                }
+            });
+        });
+    });
+
+    // 총점 기준 내림차순 정렬
+    let indivList = Object.values(indivMap).sort((a, b) => b.totalScore - a.totalScore);
+
+    // 🌟 2. [새로운 기능] 개인별 순위표 먼저 그리기
+    html += `<h5 style="color:#e67e22; margin-top:0; margin-bottom:10px; border-left:4px solid #e67e22; padding-left:8px;">🏅 개인별 종합 순위</h5>`;
+    
+    if (indivList.length > 0) {
+        html += `<table class="stats-table" style="margin-bottom: 25px; border: 2px solid #f39c12;">
+                    <thead style="background:#fdf2e9;">
+                        <tr><th>순위</th><th>이름</th><th>게임</th><th>총점</th><th>AVG</th></tr>
+                    </thead>
+                    <tbody>`;
+        indivList.forEach((p, i) => {
+            // 평균 계산 (소수점 반올림)
+            const avg = p.gameCount > 0 ? Math.round(p.totalScore / p.gameCount) : 0;
+            const avgStyle = avg >= 200 ? 'color:#e74c3c; font-weight:bold;' : 'color:#555;';
+            
+            html += `<tr>
+                        <td>${i + 1}</td>
+                        <td style="font-weight:bold;">${i === 0 ? '👑 ' : ''}${p.name}</td>
+                        <td>${p.gameCount}G</td>
+                        <td style="color:#d35400; font-weight:bold;">${p.totalScore}</td>
+                        <td style="${avgStyle}">${avg}</td>
+                     </tr>`;
+        });
+        html += `   </tbody>
+                 </table>`;
+    } else {
+        html += `<div style="padding:15px; text-align:center; color:#999; border:1px dashed #ddd; margin-bottom:20px;">입력된 개인 점수가 없습니다.</div>`;
+    }
+
+    // 🌟 3. [기존 기능] 아래쪽에 게임별 팀 결과 이어서 그리기
+    html += `<h5 style="color:#1565c0; margin-bottom:10px; border-left:4px solid #1565c0; padding-left:8px;">🏆 게임별 팀 결과</h5>`;
+    
     Object.keys(targetTeams).forEach(gameNo => {
         html += `<div style="background:#f8f9fa; padding:10px; border-radius:8px; margin-bottom:15px; border-left:5px solid #1565c0;">
                     <b style="font-size:1rem;">${gameNo}G 결과</b>`;
@@ -2826,42 +2879,54 @@ window.showArchiveDetail = function(date, type) {
 
 // 기록보관소 탭을 열 때 날짜 목록을 뿌려줍니다.
 // 📂 [업그레이드] 기록보관소 날짜 버튼 생성 엔진
+// 📂 [업그레이드] 기록보관소 날짜 세로형 리스트 + 1년 필터링 적용
 window.renderArchiveDates = function() {
     const area = document.getElementById('archiveDateList');
     if (!area) return;
 
-    // 1. 모든 히스토리 데이터 합치기
     const regHistory = window.regularHistoryCache || {};
     const lightHistory = window.lightningHistoryCache || {};
 
     const regDates = Object.keys(regHistory).map(d => ({date: d, type: 'regular'}));
     const lightDates = Object.keys(lightHistory).map(d => ({date: d, type: 'lightning'}));
     
-    // 2. 최신 날짜순으로 정렬 (2026-02-22 -> 2026-02-21 ...)
-    const allDates = [...regDates, ...lightDates].sort((a, b) => b.date.localeCompare(a.date));
+    // 1. 최신 날짜순으로 정렬
+    let allDates = [...regDates, ...lightDates].sort((a, b) => b.date.localeCompare(a.date));
+
+    // 🌟 2. [추가] 오늘 기준으로 딱 1년 전 날짜 계산
+    const oneYearAgo = new Date();
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+    const cutoffDate = oneYearAgo.toISOString().split('T')[0];
+
+    // 1년이 지난 데이터는 아예 리스트에서 제외 (화면용 필터링)
+    allDates = allDates.filter(item => item.date >= cutoffDate);
 
     if (allDates.length === 0) {
-        area.innerHTML = '<div style="color:#999; padding:20px; text-align:center; width:100%;">저장된 기록이 없습니다.</div>';
+        area.innerHTML = '<div style="color:#999; padding:20px; text-align:center; width:100%;">저장된 최근 1년 기록이 없습니다.</div>';
         return;
     }
 
-    // 3. 버튼 컨테이너 설정 (가로 스크롤 및 간격 유지)
-    area.style.display = "flex";
-    area.style.gap = "10px";
-    area.style.overflowX = "auto";
-    area.style.padding = "10px 5px";
-    area.style.webkitOverflowScrolling = "touch"; // 아이폰 부드러운 스크롤
+    // 🌟 3. [UI 변경] 가로 스크롤 제거 -> 깔끔한 세로 박스로 변경
+    area.style.display = "block"; 
+    area.style.maxHeight = "300px"; // 박스 높이 제한 (스크롤 지옥 방지)
+    area.style.overflowY = "auto";  // 내부 세로 스크롤 활성화
+    area.style.padding = "10px";
+    area.style.background = "#f4f6f8";
+    area.style.borderRadius = "10px";
+    area.style.border = "1px solid #e1e4e8";
 
-    // 4. 날짜 버튼 생성 (전체 날짜 표시 + 압축 방지)
+    // 4. 가로 꽉 차는 세로 버튼 디자인 적용
     area.innerHTML = allDates.map(item => `
         <button onclick="window.showArchiveDetail('${item.date}', '${item.type}')" 
-                style="padding:12px 20px; border-radius:30px; border:none; 
-                       background:${item.type==='regular'?'#e03131':'#fab005'}; 
-                       color:white; font-weight:bold; white-space:nowrap; 
-                       cursor:pointer; font-size:1rem; flex-shrink:0; 
-                       box-shadow:0 4px 6px rgba(0,0,0,0.1);
-                       transition: transform 0.1s;">
-            ${item.type==='regular'?'🏆':'⚡'} ${item.date}
+                style="width:100%; text-align:left; padding:15px; margin-bottom:8px; 
+                       border-radius:10px; border:1px solid #ddd;
+                       background:${item.type==='regular'?'#fff5f5':'#fffdeb'}; 
+                       color:${item.type==='regular'?'#c0392b':'#d35400'}; 
+                       font-weight:bold; cursor:pointer; font-size:1.05rem; 
+                       box-shadow:0 2px 4px rgba(0,0,0,0.05); transition:transform 0.1s;">
+            <span style="display:inline-block; width:30px;">${item.type==='regular'?'🏆':'⚡'}</span> 
+            ${item.date} ${item.type==='regular'?'정기모임':'번개모임'}
+            <span style="float:right; color:#adb5bd; font-size:0.85rem; margin-top:3px;">상세보기 ❯</span>
         </button>
     `).join('');
 };
@@ -3233,7 +3298,64 @@ window.finishMeetingAndArchive = function() {
     });
 };
 
+// 🧹 [자동 청소 엔진] 1년이 지난 오래된 데이터 DB에서 자동 소각
+let hasRunCleanup = false;
 
+window.autoCleanUpOldData = function() {
+    // 일반 회원이 접속할 때마다 삭제가 돌면 서버에 무리가 가므로, "관리자"가 접속했을 때 단 1번만 몰래 실행
+    if (!isAdmin || hasRunCleanup) return;
+    hasRunCleanup = true;
+
+    const oneYearAgo = new Date();
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+    const cutoffDate = oneYearAgo.toISOString().split('T')[0];
+
+    // 1. 히스토리 및 아카이브 청소
+    const pathsToClean = ['regular_history', 'lightning_history', 'archives'];
+    pathsToClean.forEach(path => {
+        db.ref(`bowling_v14/${path}`).once('value', sn => {
+            const data = sn.val() || {};
+            let updates = {};
+            let hasOldData = false;
+            
+            Object.keys(data).forEach(dateKey => {
+                let formattedDate = dateKey;
+                if(dateKey.length === 8 && !dateKey.includes('-')) {
+                    formattedDate = `${dateKey.substring(0,4)}-${dateKey.substring(4,6)}-${dateKey.substring(6,8)}`;
+                }
+                
+                if (formattedDate < cutoffDate) {
+                    updates[dateKey] = null; // 삭제 예약
+                    hasOldData = true;
+                }
+            });
+            if (hasOldData) db.ref(`bowling_v14/${path}`).update(updates);
+        });
+    });
+
+    // 2. 개인 장부(records) 청소 (예: "2024-01-01_김범주" 삭제)
+    db.ref('bowling_v14/records').once('value', sn => {
+        const data = sn.val() || {};
+        let updates = {};
+        let hasOldData = false;
+        
+        Object.keys(data).forEach(key => {
+            const datePart = key.split('_')[0]; 
+            if (datePart < cutoffDate) {
+                updates[key] = null; // 1년 지난 점수 삭제 예약
+                hasOldData = true;
+            }
+        });
+        if (hasOldData) db.ref('bowling_v14/records').update(updates);
+    });
+};
+
+// 화면이 업데이트 될 때 자동 청소 엔진 가동
+const originalUpdateUIForCleanup = window.updateUI;
+window.updateUI = function() {
+    if (originalUpdateUIForCleanup) originalUpdateUIForCleanup();
+    window.autoCleanUpOldData();
+};
 </script> 
 
 <div id="admin-notice-panel" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width: 90%; max-width: 400px; background:#fff; z-index:10000; border:3px solid #FFEB33; padding:20px; border-radius:15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
