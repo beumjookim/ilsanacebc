@@ -698,7 +698,7 @@
     </div>
 
 <script>
-    let members=[], attendees=[], records=[], gameTeams={}, events={};
+    let members=[], attendees=[], records=[], gameTeams={}, gameScores={}, events={};
     let settings = { mode: 'regular', gameCount: 4, avgCriteria: 6, assignMethod: 'ai' };
     window.isConfigEditing = false; // 레인 설정 입력 중인지 확인하는 깃발
     let managers = { jungmo: '', lightning: '' }; 
@@ -2939,65 +2939,8 @@ window.assignTeams = function() {
         alert(`${isIndividualMode ? '⚡ 번개 랜덤 개인전' : '⚖️ 정기 팀전'} 조편성이 완료되었습니다.`);
     });
 };
-window.renderInputs = function() {
-    const area = document.getElementById('inputGridArea');
-    const myName = (loggedInUser || "").trim();
-    const isPowerfulManager = isAdmin || (managers.jungmo === myName) || (managers.lightning === myName);
-    const isIndividualMode = (settings.mode === 'individual');
 
-    let gData = gameTeams[currentInputGame] || [];
-    let h = '';
 
-    gData.forEach(t => {
-        const isMyTeam = t.members.some(m => m.name === myName);
-        if (!isPowerfulManager && !isMyTeam) return; // 👁️ 내 레인 아니면 숨김
-
-        const boxTitle = isIndividualMode ? `Lane ${t.members[0].lane}` : `Team ${t.teamNo}`;
-        h += `<div class="input-team-box" style="border: 2px solid ${isMyTeam ? 'var(--accent)' : '#eee'};">
-                <div class="input-team-header">${boxTitle}</div>`;
-        
-        t.members.forEach(m => {
-            const isMe = (m.name === myName);
-            // 🛡️ [권한] 본인이거나 운영진만 수정 가능
-            const canEdit = isMe || isPowerfulManager;
-
-            h += `
-            <div class="score-row" style="display:flex; justify-content:space-between; align-items:center; padding:10px 15px; border-bottom:1px solid #eee;">
-                <span class="score-name" style="${isMe ? 'color:var(--accent); font-weight:bold;' : ''}">${m.name}</span>
-                <input type="number" inputmode="numeric" class="score-input"
-                       value="${m.score||0}" 
-                       ${!canEdit ? 'readonly style="background:#f8f9fa; color:#ccc;"' : ''}
-                       onblur="if(${canEdit}) window.syncScoreDirect('${currentInputGame}', '${t.teamNo}', '${m.name}', this.value)"
-                       style="width:80px; height:40px; font-size:1.3rem; text-align:center; border-radius:8px;">
-            </div>`;
-        });
-
-        // 💾 [저장] 1번(레인장) 또는 운영진만 노출
-        const isLeader = (myName === (t.members[0]?.name || ""));
-        if (isLeader || isPowerfulManager) {
-            h += `<div style="padding:15px; text-align:center;">
-                    <button class="universal-btn" style="background:var(--accent); margin:0;" onclick="window.saveAllScores()">💾 점수 확정</button>
-                  </div>`;
-        }
-        h += `</div>`;
-    });
-    area.innerHTML = h || '<div style="padding:40px; text-align:center;">표시할 데이터가 없습니다.</div>';
-};
-
-// 실시간 개별 점수 전송 함수
-window.syncScoreDirect = function(gameNo, teamNo, userName, newScore) {
-    const scoreVal = parseInt(newScore) || 0;
-    db.ref(`bowling_v14/gameTeams/${gameNo}`).once('value', sn => {
-        const teams = sn.val() || [];
-        const tIdx = teams.findIndex(t => t.teamNo == teamNo);
-        if(tIdx > -1) {
-            const mIdx = teams[tIdx].members.findIndex(m => m.name === userName);
-            if(mIdx > -1) {
-                db.ref(`bowling_v14/gameTeams/${gameNo}/${tIdx}/members/${mIdx}/score`).set(scoreVal);
-            }
-        }
-    });
-};
 window.getWeightedStats = function(name) {
     if (!name || name.includes("고스트")) return { weightedAvg: 0, simpleAvg12: 0 };
 
@@ -3141,7 +3084,25 @@ window.setGameMode = function(mode) {
         soloBtn.style.background = "#ccc";          soloBtn.style.color = "#555";
     }
 };
+// 1-0. 카지노 시작 버튼 (버튼이 누를 함수 추가)
+window.initCasinoFromSetup = function() {
+    if (!isAdmin) return alert("관리자만 시작할 수 있습니다.");
+    
+    let hasTeams = false;
+    for (let l = 1; l <= 20; l++) {
+        if (parseInt(laneSettings['team_' + l]) > 0) { hasTeams = true; break; }
+    }
+    if (!hasTeams) return alert("조편성 하단의 '팀 번호'를 먼저 입력해야 카지노가 가능합니다!");
 
+    if (!confirm("카지노 판을 새로 깔까요? (기존 데이터 초기화)")) return;
+
+    db.ref('bowling_v14/casino').set(null).then(() => {
+        window.initCasino(); 
+        window.showPanel('casinoPanel', document.querySelectorAll('.tab-btn')[2]); 
+    }).catch(err => {
+        alert("데이터 초기화 실패: " + err.message);
+    });
+};
 // 1. [카지노 시작] 버튼 연동 (이동 + 생성)
 // 1. 카지노 생성 (팀 번호 완벽 삽입)
 window.initCasino = function() {
