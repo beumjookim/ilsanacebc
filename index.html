@@ -356,12 +356,12 @@
     font-size: 0.8rem;
 }
 
-/* 5. 등급별 칩 색상 (앞면에 그라데이션 적용) */
-.redChips .chip-back    { background: radial-gradient(#b30000, #ff4d4d); }
-.blueChips .chip-back   { background: radial-gradient(#0044cc, #4d94ff); }
-.yellowChips .chip-back { background: radial-gradient(#b38f00, #ffd633); }
-.greenChips .chip-back  { background: radial-gradient(#1e7b1e, #5cd65c); }
-.purpleChips .chip-back { background: radial-gradient(#6c5ce7, #a29bfe); }
+/* 5. 등급별 칩 색상 (앞면과 뒷면 모두 색상 완벽 적용) */
+.redChips .chip-front, .redChips .chip-back       { background: radial-gradient(circle, #ff4d4d, #b30000); }
+.blueChips .chip-front, .blueChips .chip-back      { background: radial-gradient(circle, #4da6ff, #0059b3); }
+.greenChips .chip-front, .greenChips .chip-back     { background: radial-gradient(circle, #5cd65c, #1e7b1e); }
+.yellowChips .chip-front, .yellowChips .chip-back    { background: radial-gradient(circle, #f1c40f, #b38f00); }
+.purpleChips .chip-front, .purpleChips .chip-back    { background: radial-gradient(circle, #a29bfe, #6c5ce7); }
 
 /* 6. 구역 제목 (Ace, Pro 등) */
 #casinoArea h3 {
