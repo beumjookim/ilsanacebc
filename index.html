@@ -871,6 +871,11 @@ window.runAssignment = function() {
             window.showPanel('progressPanel', document.querySelectorAll('.tab-btn')[3]);
             alert(`✅ 배정 완료! (고스트 자동 보정됨)`);
         });
+    } catch (e) {
+        console.error(e);
+    }
+};
+
 // 4. 앱 진입 함수
 window.enterApp = function() {
     const landing = document.getElementById('landingPage');
@@ -2209,6 +2214,7 @@ window.finishCasino = function() {
     }).catch(err => {
         alert("저장 실패: " + err.message);
     });
+};
     
     window.nextTeam = function(lane, current) {
     let next = (current >= 8) ? 0 : current + 1;
