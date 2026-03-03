@@ -867,14 +867,10 @@ window.runAssignment = function() {
             'settings/currentTab': 'progressPanel',
             'settings/currentRankView': currentTargetGame
         }).then(() => {
+            currentRankView = currentTargetGame; // 🎯 이 한 줄 추가!
             window.showPanel('progressPanel', document.querySelectorAll('.tab-btn')[3]);
             alert(`✅ 배정 완료! (고스트 자동 보정됨)`);
         });
-
-    } catch (err) {
-        alert("🚨 배정 오류: " + err.message);
-    }
-};
 // 4. 앱 진입 함수
 window.enterApp = function() {
     const landing = document.getElementById('landingPage');
@@ -1831,30 +1827,29 @@ window.saveAllScores = function() {
         updates['bowling_v14/gameTeams'] = cleanData;
 
         let finishedGame = currentInputGame || 1;
-        // 🎯 다음 게임 번호 계산 (현재 게임 + 1, 최대치 안 넘게)
         let nextGame = finishedGame + 1;
         const maxGame = settings.gameCount || 4;
         if (nextGame > maxGame) nextGame = finishedGame;
 
-        // DB 업데이트: 통계 창으로 이동 및 통계는 방금 끝난 게임 보여주기
+        // 🎯 [핵심] 서버(DB)에 다음 진행할 게임 번호를 완벽히 기록
         updates['bowling_v14/settings/currentTab'] = 'statsPanel';
         updates['bowling_v14/settings/currentStatsGame'] = finishedGame;
+        updates['bowling_v14/settings/currentAssignGame'] = nextGame;
+        updates['bowling_v14/settings/currentInputGame'] = nextGame;
+        updates['bowling_v14/settings/currentRankView'] = nextGame;
 
         db.ref().update(updates)
             .then(() => {
-                // ✅ [핵심 수리] 점수 저장 성공 시, 모든 탭의 커서를 다음 게임으로 자동 전진!
-                currentTargetGame = nextGame; // 조편성/카지노 탭 -> 다음 게임 대기
-                currentRankView = nextGame;   // 진행 탭 -> 다음 게임 대기
-                currentInputGame = nextGame;  // 점수 입력 탭 -> 다음 게임 대기
+                // 내 폰 화면의 탭 커서들도 다음 게임으로 강제 이동!
+                currentTargetGame = nextGame;
+                currentRankView = nextGame;
+                currentInputGame = nextGame;
 
                 alert(`✅ ${finishedGame}G 저장 완료! (다음 진행: ${nextGame}G 세팅됨)`);
                 
-                // 통계 패널로 이동
                 if(document.querySelectorAll('.tab-btn')[5]) {
                     window.showPanel('statsPanel', document.querySelectorAll('.tab-btn')[5]);
                 }
-                
-                // 탭 버튼들 시각적 갱신
                 if(typeof window.renderAssignGameTabs === 'function') window.renderAssignGameTabs();
             })
             .catch(err => {
@@ -2208,12 +2203,12 @@ window.finishCasino = function() {
     updates['bowling_v14/settings/currentInputGame'] = currentTargetGame; 
 
     db.ref().update(updates).then(() => {
+        currentInputGame = currentTargetGame; // 🎯 이 한 줄 추가!
         alert("✅ 배정 완료! 점수 입력창으로 바로 이동합니다.");
         window.showPanel('inputPanel', document.querySelectorAll('.tab-btn')[4]);
     }).catch(err => {
         alert("저장 실패: " + err.message);
     });
-}; // ★ 괄호 마무리
     
     window.nextTeam = function(lane, current) {
     let next = (current >= 8) ? 0 : current + 1;
@@ -2301,13 +2296,12 @@ window.loadLightningHistory = function(date) {
 };
 
 window.isScoreEditing = false;
+let isAppInitialized = false; // 🎯 앱 처음 켰는지 확인하는 깃발 추가!
 
-// ✅ [수정된 마스터 감시자] 점수 증발 방지 및 화면 동기화 통합
+// ✅ 실시간 데이터 동기화 마스터 엔진 (중복 제거 및 최적화)
 if (db) {
-    db.ref('bowling_v14').off(); // 기존에 꼬여있을지 모르는 모든 감시를 일단 해제
+    db.ref('bowling_v14').off(); // 기존에 꼬여있을지 모르는 감시 해제
 
-    // ✅ 실시간 데이터 동기화 마스터 엔진
-if (db) {
     db.ref('bowling_v14').on('value', sn => {
         const val = sn.val() || {};
         
@@ -2316,10 +2310,20 @@ if (db) {
         records = val.records ? Object.keys(val.records).map(k => ({ ...val.records[k], key: k })) : [];
         events = val.events || {};
         
-        // ✨ [핵심 추가] 카지노 데이터를 전역 변수 'casino'에 저장
+        // ✨ 카지노 데이터를 전역 변수 'casino'에 저장
         window.casino = val.casino || null; 
         
-        if(val.settings) settings = val.settings;
+        if(val.settings) {
+            settings = val.settings;
+            // 🎯 [핵심] 처음에 앱을 딱 켰을 때만 서버의 진행 상황(몇 게임인지)을 내 폰으로 동기화!
+            if (!isAppInitialized) {
+                currentTargetGame = settings.currentAssignGame || 1;
+                currentInputGame = settings.currentInputGame || 1;
+                currentRankView = settings.currentRankView || 1;
+                isAppInitialized = true;
+            }
+        }
+        
         if(val.managers) managers = val.managers; 
         if(val.laneSettings) laneSettings = val.laneSettings || {}; 
         if(val.selectedBlocks) selectedBlocks = val.selectedBlocks || []; 
@@ -2329,7 +2333,6 @@ if (db) {
             window.updateUI();
         }
     });
-}
 }
 window.renderInputs = function() {
     const tabs = document.getElementById('inputTabs');
