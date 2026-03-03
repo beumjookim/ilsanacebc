@@ -1979,24 +1979,29 @@ window.resetAssignment = function() {
     const isBoss = isAdmin || (managers.jungmo === myName) || (managers.lightning === myName);
     if (!isBoss) return alert("🚫 초기화 권한이 없습니다.");
 
-    const gIdx = currentTargetGame; 
-    if (confirm(`⚠️ [완전 초기화] 현재 [${gIdx}G]의 결과와\n참석자 명단(번개장 선택 포함)을 모두 삭제하시겠습니까?`)) {
+    // 🎯 안내 문구도 더 명확하게 수정
+    if (confirm(`⚠️ [완전 초기화] 오늘 진행한 모든 게임(1~6G)의 점수와\n조편성, 참석자 명단을 완전히 싹 비우시겠습니까?`)) {
         let updates = {};
-        updates[`bowling_v14/gameTeams/${gIdx}`] = null;
+        
+        // 🚨 [핵심 수리] 특정 게임만 지우지 않고 gameTeams 전체를 폭파시켜 찌꺼기 박멸!
+        updates['bowling_v14/gameTeams'] = null; 
+        
         updates['bowling_v14/casino'] = null;
         updates['bowling_v14/managers/lightning'] = null;
         updates['bowling_v14/laneSettings'] = null; 
         updates['bowling_v14/selectedBlocks'] = null; 
-        
-        // ✨ [핵심 추가] 참석자 명단(attendees)도 함께 비웁니다!
         updates['bowling_v14/attendees'] = []; 
+        
+        // 탭 커서들도 1게임으로 깔끔하게 리셋
         updates['bowling_v14/settings/currentAssignGame'] = 1;
+        updates['bowling_v14/settings/currentInputGame'] = 1;
+        updates['bowling_v14/settings/currentRankView'] = 1;
 
         db.ref().update(updates).then(() => {
-            // 로컬 변수도 즉시 비워줍니다 (충돌 방지)
             attendees = []; 
-            alert(`✅ 모든 데이터가 깨끗하게 초기화되었습니다.`);
-            location.reload(); // 확실한 화면 갱신을 위해 리로드 추천
+            gameTeams = {}; // 내 폰에 남은 찌꺼기도 삭제
+            alert(`✅ 모든 데이터가 찌꺼기 없이 깨끗하게 초기화되었습니다.`);
+            location.reload(); 
         });
     }
 };
