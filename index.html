@@ -2322,9 +2322,10 @@ window.loadLightningHistory = function(date) {
 };
 
 window.isScoreEditing = false;
-let isAppInitialized = false; // 🎯 앱 처음 켰는지 확인하는 깃발 추가!
+let isAppInitialized = false; 
+let serverAssignGame = 1; // 🎯 [추가] 서버의 공식 진행 게임 번호를 추적하는 요원
 
-// ✅ 실시간 데이터 동기화 마스터 엔진 (중복 제거 및 최적화)
+// ✅ 실시간 데이터 동기화 마스터 엔진 (스마트 동기화 업그레이드)
 if (db) {
     db.ref('bowling_v14').off(); // 기존에 꼬여있을지 모르는 감시 해제
 
@@ -2336,17 +2337,25 @@ if (db) {
         records = val.records ? Object.keys(val.records).map(k => ({ ...val.records[k], key: k })) : [];
         events = val.events || {};
         
-        // ✨ 카지노 데이터를 전역 변수 'casino'에 저장
         window.casino = val.casino || null; 
         
         if(val.settings) {
             settings = val.settings;
-            // 🎯 [핵심] 처음에 앱을 딱 켰을 때만 서버의 진행 상황(몇 게임인지)을 내 폰으로 동기화!
-            if (!isAppInitialized) {
-                currentTargetGame = settings.currentAssignGame || 1;
-                currentInputGame = settings.currentInputGame || 1;
-                currentRankView = settings.currentRankView || 1;
+            
+            const dbGameNo = settings.currentAssignGame || 1;
+            
+            // 🎯 [핵심 수리] 앱을 처음 켰거나 OR 누군가 저장을 완료해서 다음 게임으로 넘어갔을 때!
+            if (!isAppInitialized || dbGameNo > serverAssignGame) {
+                currentTargetGame = dbGameNo;
+                currentInputGame = dbGameNo;
+                currentRankView = dbGameNo;
+                serverAssignGame = dbGameNo; // 내 폰도 서버의 새 번호로 업데이트
                 isAppInitialized = true;
+            }
+            
+            // 🛡️ [안전장치] 완전 초기화 버튼을 눌러서 서버 게임이 1로 돌아갔을 때의 방어
+            if (dbGameNo < serverAssignGame) {
+                serverAssignGame = dbGameNo;
             }
         }
         
