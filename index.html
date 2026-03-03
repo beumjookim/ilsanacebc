@@ -100,18 +100,24 @@
 }
 
        .tab-btn { 
-    flex-shrink: 0; /* ★ 버튼이 압축되지 않도록 설정 */
-    padding: 10px 15px; /* 양옆 여백을 충분히 줌 */
-    white-space: nowrap; /* 글자가 줄바꿈되지 않게 함 */
+    flex-shrink: 0; 
+    padding: 10px 15px; 
+    white-space: nowrap; 
     border: 1px solid #eee; 
     background: #f8f9fa; 
     border-radius: 8px; 
     font-weight: bold; 
     cursor: pointer; 
     text-align: center; 
-    color: #555; 
+    color: #555;  
 }
-        
+   /* 활성화된 현재 탭 파란색으로 강조 */
+.tab-btn.active {
+    background: #3498db; /* 에이스 볼링 공식 파란색 */
+    color: white;
+    border-color: #3498db;
+    box-shadow: 0 2px 4px rgba(52, 152, 219, 0.3); /* 살짝 예쁜 그림자 추가 */
+}     
         /* 3. 입력창이 가려지지 않게 하단 여백 확보 */
 .content-area {
     flex: 1; /* 남은 공간 꽉 채우기 */
@@ -555,43 +561,40 @@
             </div>
 
             <div id="inputPanel" class="panel">
-                <div id="scoreSection">
-                    <div class="input-box">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                            <h3 style="margin:0;">📝 점수 입력 (<span id="inputGameTitle">1G</span>)</h3>
-                            <button class="btn-sm" onclick="window.saveAllScores()" style="background:var(--accent); color:white; border:none;">💾 저장</button>
-                        </div>
-                        
-                        <div id="filterInfo" style="display:none; background:#f3e5f5; padding:12px; border-radius:8px; margin-bottom:15px; text-align:center; font-weight:bold; color:#8e44ad; border:1px solid #e1bee7;">
-                            <span id="filterTeamName"></span> 점수 입력 중...
-                        </div>
-
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                            <input type="date" id="inputDate" class="big-input" style="width:60%; margin:0;" onchange="window.renderInputs()">
-                            <button class="btn-sm" onclick="window.showAllTeams()" style="background:#95a5a6; color:white;">📂 전체 보기</button>
-                        </div>
-                        
-                        <div id="inputTabs" class="rank-tabs"></div>
-                        <div id="inputGridArea" style="margin-top:15px;"></div>
-                        
-                        <button class="universal-btn" onclick="window.saveAllScores()" style="background:var(--accent); margin-top:20px;">💾 점수 저장 완료</button>
-                    </div>
-                <button class="universal-btn" onclick="window.saveAllScores()" style="background:var(--accent); margin-top:20px;">💾 점수 저장 완료</button>
-
-<div style="margin-top: 40px; padding: 20px; border: 2px dashed #e67e22; border-radius: 12px; background: #fffcf9; text-align: center;">
-    <h4 style="margin-top:0; color:#e67e22;">🏁 오늘 모임 최종 완료</h4>
-    <p style="font-size: 0.85rem; color: #777; margin-bottom: 15px; line-height: 1.4;">
-        모든 게임이 끝났나요?<br>
-        기록을 <b>보관소(Archives)</b>로 옮기고 오늘 판을 비웁니다.
-    </p>
-    <button class="universal-btn" 
-            style="background: #2c3e50; color: white; font-weight: bold; height: 50px; border: none; width: 100%;" 
-            onclick="window.finishMeetingAndArchive()">
-        🚀 기록 보관 및 다음 모임 준비
-    </button>
-</div>
+    <div id="scoreSection">
+        <div class="input-box">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h3 style="margin:0;">📝 점수 입력 (<span id="inputGameTitle">1G</span>)</h3>
                 </div>
+            
+            <div id="filterInfo" style="display:none; background:#f3e5f5; padding:12px; border-radius:8px; margin-bottom:15px; text-align:center; font-weight:bold; color:#8e44ad; border:1px solid #e1bee7;">
+                <span id="filterTeamName"></span> 점수 입력 중...
             </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <input type="date" id="inputDate" class="big-input" style="width:60%; margin:0;" onchange="window.renderInputs()">
+                <button class="btn-sm" onclick="window.showAllTeams()" style="background:#95a5a6; color:white;">📂 전체 보기</button>
+            </div>
+            
+            <div id="inputTabs" class="rank-tabs"></div>
+            <div id="inputGridArea" style="margin-top:15px;"></div>
+            
+            </div>
+
+        <div style="margin-top: 40px; padding: 20px; border: 2px dashed #e67e22; border-radius: 12px; background: #fffcf9; text-align: center;">
+            <h4 style="margin-top:0; color:#e67e22;">🏁 오늘 모임 최종 완료</h4>
+            <p style="font-size: 0.85rem; color: #777; margin-bottom: 15px; line-height: 1.4;">
+                모든 게임이 끝났나요?<br>
+                기록을 <b>보관소(Archives)</b>로 옮기고 오늘 판을 비웁니다.
+            </p>
+            <button class="universal-btn" 
+                    style="background: #2c3e50; color: white; font-weight: bold; height: 50px; border: none; width: 100%;" 
+                    onclick="window.finishMeetingAndArchive()">
+                🚀 기록 보관 및 다음 모임 준비
+            </button>
+        </div>
+    </div>
+</div>
 
             <div id="statsPanel" class="panel">
                 <div class="input-box">
@@ -1827,21 +1830,32 @@ window.saveAllScores = function() {
         let updates = {};
         updates['bowling_v14/gameTeams'] = cleanData;
 
-        let nextGame = (currentInputGame || 1) + 1;
+        let finishedGame = currentInputGame || 1;
+        // 🎯 다음 게임 번호 계산 (현재 게임 + 1, 최대치 안 넘게)
+        let nextGame = finishedGame + 1;
         const maxGame = settings.gameCount || 4;
-        if (nextGame > maxGame) nextGame = currentInputGame;
+        if (nextGame > maxGame) nextGame = finishedGame;
 
+        // DB 업데이트: 통계 창으로 이동 및 통계는 방금 끝난 게임 보여주기
         updates['bowling_v14/settings/currentTab'] = 'statsPanel';
-        updates['bowling_v14/settings/currentStatsGame'] = currentInputGame;
-        updates['bowling_v14/settings/currentAssignGame'] = nextGame;
-        updates['bowling_v14/settings/currentRankView'] = currentInputGame;
+        updates['bowling_v14/settings/currentStatsGame'] = finishedGame;
 
         db.ref().update(updates)
             .then(() => {
-                alert(`✅ ${currentInputGame}G 저장 성공!`);
+                // ✅ [핵심 수리] 점수 저장 성공 시, 모든 탭의 커서를 다음 게임으로 자동 전진!
+                currentTargetGame = nextGame; // 조편성/카지노 탭 -> 다음 게임 대기
+                currentRankView = nextGame;   // 진행 탭 -> 다음 게임 대기
+                currentInputGame = nextGame;  // 점수 입력 탭 -> 다음 게임 대기
+
+                alert(`✅ ${finishedGame}G 저장 완료! (다음 진행: ${nextGame}G 세팅됨)`);
+                
+                // 통계 패널로 이동
                 if(document.querySelectorAll('.tab-btn')[5]) {
                     window.showPanel('statsPanel', document.querySelectorAll('.tab-btn')[5]);
                 }
+                
+                // 탭 버튼들 시각적 갱신
+                if(typeof window.renderAssignGameTabs === 'function') window.renderAssignGameTabs();
             })
             .catch(err => {
                 alert("❌ 저장 거부됨 (원인: " + err.message + ")");
