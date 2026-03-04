@@ -716,60 +716,115 @@
     </div>
 
 <script>
+    // 1. Firebase 정식 설정 (콘솔 프로젝트 설정에서 복사한 값으로 교체하세요)
+    const firebaseConfig = {
+        apiKey: "여기에_실제_API_키를_넣으세요", // ★ 필수: 이게 없으면 로그인이 안 됩니다!
+        authDomain: "ilsan-ace-bowling-team.firebaseapp.com",
+        databaseURL: "https://ilsan-ace-bowling-team-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "ilsan-ace-bowling-team",
+        storageBucket: "ilsan-ace-bowling-team.appspot.com",
+        messagingSenderId: "...",
+        appId: "..."
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    const auth = firebase.auth(); // 인증 서비스 연결
+
+    // 2. 전역 변수 설정
     let members=[], attendees=[], records=[], gameTeams={}, gameScores={}, events={};
     let settings = { mode: 'regular', gameCount: 4, avgCriteria: 6, assignMethod: 'ai' };
-    window.isConfigEditing = false; // 레인 설정 입력 중인지 확인하는 깃발
+    window.isConfigEditing = false;
     let managers = { jungmo: '', lightning: '' }; 
-    let selectedBlocks = [], laneSettings = {};   
-    let db = null;
-    // [추가] 주소창에서 특정 이벤트 ID가 있는지 확인하고 기억함
-const urlParams = new URLSearchParams(window.location.search);
-const jumpTarget = urlParams.get('eventId');
-if (jumpTarget) sessionStorage.setItem('jumpToEvent', jumpTarget);
+    let selectedBlocks = [], laneSettings = {}; 
+
+    // 주소창 파라미터 확인 및 기억
+    const urlParams = new URLSearchParams(window.location.search);
+    const jumpTarget = urlParams.get('eventId');
+    if (jumpTarget) sessionStorage.setItem('jumpToEvent', jumpTarget);
+
     let loggedInUser = localStorage.getItem('loggedInUser');
     let isAdmin = localStorage.getItem('ace_admin') === 'true';
     
     let currentRankView = 1, currentInputGame = 1, currentTargetGame = 1;
-    // 기본값을 'all'에서 '6m'으로 변경합니다.
-let currentStatsGame = 1, currentStatsPeriod = '6m', currentGenderFilter = 'all';
+    let currentStatsGame = 1, currentStatsPeriod = '6m', currentGenderFilter = 'all';
     let currentInputTeam = null; 
 
-    firebase.initializeApp({ databaseURL: "https://ilsan-ace-bowling-team-default-rtdb.asia-southeast1.firebasedatabase.app" });
-    db = firebase.database();
+    // 🛡️ 3. 로그인 상태 감시 센서 (onAuthStateChanged)
+    auth.onAuthStateChanged((user) => {
+        const loginScreen = document.getElementById('globalLoginScreen');
+        const mainCont = document.getElementById('mainContainer');
 
-// 3. 엔터키로 다음 입력칸 이동
-// 3. 엔터키로 다음 입력칸 이동
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') {
-        const inputs = Array.from(document.querySelectorAll('.lane-input'));
-        const index = inputs.indexOf(document.activeElement);
-        if (index > -1 && index < inputs.length - 1) {
-            e.preventDefault(); 
-            inputs[index + 1].focus(); 
-            if(inputs[index + 1].value) inputs[index + 1].select();
+        if (user) {
+            // [성공] 서버 인증 완료됨
+            if (loginScreen) loginScreen.style.display = 'none';
+            if (mainCont) mainCont.style.display = 'block';
+
+            // 김범주 마스터키 확인 (이메일 기반 관리자 판별)
+            if (user.email === '김범주@ace.com') {
+                localStorage.setItem('ace_admin', 'true');
+                isAdmin = true;
+            }
+            window.updateUI(); // 로그인 성공 후 화면 갱신 함수 호출
+        } else {
+            // [실패/로그아웃] 인증되지 않은 상태
+            if (loginScreen) loginScreen.style.display = 'flex';
+            if (mainCont) mainCont.style.display = 'none';
         }
-    }
-});
+    });
 
-// [핵심] 페이지 로드 시 네이버 주소 있으면 자동 이동
-window.addEventListener('load', function() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const targetUrl = urlParams.get('target');
-    
-    // 만약 주소에 네이버 게시글 주소가 들어있다면? 바로 그곳으로 이동!
-    if (targetUrl) {
-        window.location.replace(decodeURIComponent(targetUrl));
-        return;
-    }
+    // 🔑 4. 이름 기반 로그인 처리 함수
+    window.doGlobalLogin = function() {
+        const nameInput = document.getElementById('globalId').value.trim();
+        const pwInput = document.getElementById('globalPw').value.trim();
 
-    // 카카오 초기화 (안전하게 로드 후 실행)
-    try {
-        if (typeof Kakao !== 'undefined' && !Kakao.isInitialized()) {
-            Kakao.init('fa7a8ba02d5835b0aa4183eac217cb7a');
-            console.log("카카오 초기화 성공");
+        if(!nameInput || !pwInput) return alert("이름과 비밀번호를 입력해주세요.");
+
+        // 이름 뒤에 @ace.com을 자동으로 붙여 이메일 형식으로 변환
+        const finalEmail = nameInput + "@ace.com"; 
+
+        auth.signInWithEmailAndPassword(finalEmail, pwInput)
+            .then((userCredential) => {
+                const user = userCredential.user;
+                localStorage.setItem('loggedInUser', nameInput);
+                alert(nameInput + "님, 인증되었습니다!");
+            })
+            .catch((error) => {
+                console.error("인증 실패:", error.code);
+                alert("❌ 로그인 실패: 회원 정보를 확인하거나 관리자에게 문의하세요.");
+            });
+    };
+
+    // ⌨️ 5. 엔터키로 다음 입력칸 이동 (범주님의 기존 로직 유지)
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            const inputs = Array.from(document.querySelectorAll('.lane-input'));
+            const index = inputs.indexOf(document.activeElement);
+            if (index > -1 && index < inputs.length - 1) {
+                e.preventDefault(); 
+                inputs[index + 1].focus(); 
+                if(inputs[index + 1].value) inputs[index + 1].select();
+            }
         }
-    } catch (e) { console.log("카카오 체크 중"); }
-});
+    });
+
+    // 🔗 6. 페이지 로드 시 네이버 주소 자동 이동 및 카카오 초기화 (기존 로직 유지)
+    window.addEventListener('load', function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const targetUrl = urlParams.get('target');
+        
+        if (targetUrl) {
+            window.location.replace(decodeURIComponent(targetUrl));
+            return;
+        }
+
+        try {
+            if (typeof Kakao !== 'undefined' && !Kakao.isInitialized()) {
+                Kakao.init('fa7a8ba02d5835b0aa4183eac217cb7a');
+                console.log("카카오 초기화 성공");
+            }
+        } catch (e) { console.log("카카오 체크 중"); }
+    });
 // 🛠️ [수리 완료] 회원 목록 그리기 함수 (강제 적용)
 window.renderMembers = function() { 
     const area = document.getElementById('memberListArea'); 
@@ -923,21 +978,36 @@ window.showGlobalLogin = function() {
 };
 
 // 2. 로그인 실행
+// 🔐 일산 에이스 전용: 이름 기반 로그인 시스템
 window.doGlobalLogin = function() {
-    const i = document.getElementById('globalId').value.trim();
-    const p = document.getElementById('globalPw').value.trim();
-    if((i==='관리자'||i==='김범주') && p==='6884') {
-        localStorage.setItem('loggedInUser', i);
-        localStorage.setItem('ace_admin', 'true');
-        location.reload();
-    } else {
-        const m = members.find(x=>x.name===i);
-        if(m && (m.pw||'1234')===p) {
-            localStorage.setItem('loggedInUser', i);
-            localStorage.setItem('ace_admin', 'false');
-            location.reload();
-        } else { alert("로그인 실패! 이름과 비밀번호를 확인하세요."); }
-    }
+    const nameInput = document.getElementById('globalId').value.trim(); // 예: 김범주
+    const pwInput = document.getElementById('globalPw').value.trim();    // 예: 6884
+
+    if(!nameInput || !pwInput) return alert("이름과 비밀번호를 입력해주세요.");
+
+    // 🛠️ 내부적으로 이메일 형식으로 자동 변환 (회원들 편의용)
+    const finalEmail = nameInput + "@ace.com"; 
+
+    firebase.auth().signInWithEmailAndPassword(finalEmail, pwInput)
+        .then((userCredential) => {
+            const user = userCredential.user;
+            
+            // 👑 김범주님 계정일 경우 관리자 권한 부여
+            if (user.email === '김범주@ace.com') {
+                localStorage.setItem('ace_admin', 'true');
+                localStorage.setItem('loggedInUser', '김범주');
+            } else {
+                localStorage.setItem('ace_admin', 'false');
+                localStorage.setItem('loggedInUser', nameInput);
+            }
+            
+            alert(nameInput + "님, 환영합니다! (안전 인증 완료)");
+            location.reload(); 
+        })
+        .catch((error) => {
+            console.error("인증 에러:", error.code);
+            alert("❌ 로그인 실패: 등록되지 않은 회원이거나 비밀번호가 틀렸습니다.");
+        });
 };
 
 // 3. 통합 패널 전환 (카지노 렌더링 포함)
