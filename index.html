@@ -2808,7 +2808,7 @@ window.setJungmoManager = function() {
         }).catch(err => alert("🚨 저장 오류: " + err.message));
     }
 };
-// 📊 [진짜 엔진] 엑셀 파일 선택 시 자동으로 데이터를 분석해서 Firebase에 저장
+
 // 📊 [진짜 엔진] 엑셀 파일 선택 시 자동으로 데이터를 분석해서 Firebase에 저장
 document.getElementById('excelInput').addEventListener('change', function(e) {
     const file = e.target.files[0];
@@ -2826,54 +2826,74 @@ document.getElementById('excelInput').addEventListener('change', function(e) {
         const sheetName = workbook.SheetNames[0];
         const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
 
-        // 🌟 [추가] 엑셀 일련번호를 진짜 날짜로 변환하는 필터기
+        // 🌟 [추가] 엑셀 일련번호 및 8자리 숫자를 진짜 날짜로 변환하는 스마트 필터기
         const convertExcelDate = (val) => {
             if (!val) return "";
+            let strVal = String(val).trim();
+            
+            // 💡 [수정1] "20220318" 같은 8자리 숫자를 "2022-03-18"로 변환
+            if (strVal.length === 8 && !isNaN(Number(strVal))) {
+                return `${strVal.substring(0,4)}-${strVal.substring(4,6)}-${strVal.substring(6,8)}`;
+            }
+            
             let num = Number(val);
-            if (!isNaN(num) && num > 30000) {
+            // 💡 [수정2] 진짜 엑셀 날짜 번호(약 44000대)만 변환 (10만 이상은 차단)
+            if (!isNaN(num) && num > 30000 && num < 100000) {
                 const jsDate = new Date((num - 25569) * 86400 * 1000);
                 return jsDate.toISOString().split('T')[0];
             }
-            return String(val).trim();
+            return strVal;
         };
 
         // 1. 날짜 라인 분석 (첫 번째 줄에서 날짜 추출)
         const dateRow = rows[0];
         const dates = [];
         let currentTempDate = "";
-        for (let i = 3; i < dateRow.length; i++) {
-            if (dateRow[i]) {
-                currentTempDate = convertExcelDate(dateRow[i]); // 🌟 변환기 통과!
+        
+        // 💡 [수정3] 시작 위치(3) 고정 삭제, 빈칸 무시하고 순서대로 날짜 맵핑
+        for (let i = 0; i < dateRow.length; i++) {
+            let cellVal = dateRow[i];
+            if (cellVal !== undefined && cellVal !== null && String(cellVal).trim() !== "" && String(cellVal).trim() !== "이름" && String(cellVal).trim() !== "번호") {
+                currentTempDate = convertExcelDate(cellVal); 
             }
-            dates[i] = currentTempDate; // 병합된 칸들도 같은 날짜로 인식
+            dates[i] = currentTempDate; 
         }
 
         // 2. 점수 데이터 분석 (세 번째 줄부터 시작)
         let updates = {};
         let count = 0;
+        
+        // 💡 [수정4] 이름(Name)이 있는 열(Column) 번호 자동 찾기 (CSV의 빈 콤마 대응)
+        let nameIdx = rows[1].findIndex(c => c === "이름");
+        if (nameIdx === -1) nameIdx = rows[0].findIndex(c => c === "이름");
+        if (nameIdx === -1) nameIdx = 2; // 파일 구조상 3번째 칸(index 2)이 이름
 
         for (let i = 2; i < rows.length; i++) {
             const row = rows[i];
-            const name = (row[0] || "").toString().trim();
+            
+            // 💡 [수정5] 찾은 nameIdx 칸(row[2])에서 정확히 이름 추출
+            const name = (row[nameIdx] || "").toString().trim();
             if (!name || name === "이름") continue;
 
-            // 각 날짜별로 4게임씩 묶어서 추출
-            for (let j = 3; j < row.length; j += 4) {
+            // 💡 [수정6] +4칸씩 건너뛰던 낡은 방식 삭제 -> 날짜별로 점수 바구니에 담기 (3게임, 4게임 모두 호환)
+            let scoresByDate = {};
+            for (let j = nameIdx + 1; j < row.length; j++) {
                 const targetDate = dates[j];
                 if (!targetDate) continue;
 
-                // 4게임 점수 가져오기 (0점이나 빈칸 제외)
-                const scs = [
-                    parseInt(row[j]) || 0,
-                    parseInt(row[j+1]) || 0,
-                    parseInt(row[j+2]) || 0,
-                    parseInt(row[j+3]) || 0
-                ].filter(s => s > 0);
+                const score = parseInt(row[j]) || 0;
+                if (score > 0) {
+                    if (!scoresByDate[targetDate]) scoresByDate[targetDate] = [];
+                    scoresByDate[targetDate].push(score);
+                }
+            }
 
+            // 날짜별로 묶인 점수를 서버 전송 양식(updates)에 담기
+            for (const [date, scs] of Object.entries(scoresByDate)) {
                 if (scs.length > 0) {
-                    const safeKey = `${targetDate}_${name.replace(/[.#$/[\]]/g, "_")}`;
+                    const safeKey = `${date}_${name.replace(/[.#$/[\]]/g, "_")}`;
                     updates[`bowling_v14/records/${safeKey}`] = {
-                        date: targetDate,
+                        date: date,
                         name: name,
                         scs: scs
                     };
@@ -2885,7 +2905,7 @@ document.getElementById('excelInput').addEventListener('change', function(e) {
         // 3. Firebase에 일괄 전송
         if (Object.keys(updates).length > 0) {
             db.ref().update(updates).then(() => {
-                alert(`🎉 성공! ${count}개의 게임 기록을 엑셀에서 가져왔습니다.\n앱을 새로고침하여 확인하세요!`);
+                alert(`🎉 성공! ${count}개의 게임 기록을 엑셀에서 완벽히 가져왔습니다.\n앱을 새로고침하여 통계 탭을 확인하세요!`);
                 location.reload();
             }).catch(err => alert("🚨 업로드 오류: " + err.message));
         } else {
