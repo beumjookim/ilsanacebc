@@ -2905,10 +2905,15 @@ document.getElementById('excelInput').addEventListener('change', function(e) {
         // 3. Firebase에 일괄 전송
         if (Object.keys(updates).length > 0) {
             db.ref().update(updates).then(() => {
+                document.getElementById('excelInput').value = ''; // 🌟 [핵심 추가] 브라우저 기억 강제 삭제!
                 alert(`🎉 성공! ${count}개의 게임 기록을 엑셀에서 완벽히 가져왔습니다.\n앱을 새로고침하여 통계 탭을 확인하세요!`);
                 location.reload();
-            }).catch(err => alert("🚨 업로드 오류: " + err.message));
+            }).catch(err => {
+                document.getElementById('excelInput').value = ''; // 🌟 [핵심 추가]
+                alert("🚨 업로드 오류: " + err.message);
+            });
         } else {
+            document.getElementById('excelInput').value = ''; // 🌟 [핵심 추가]
             alert("❌ 엑셀에서 읽을 수 있는 점수 데이터가 없습니다.");
         }
     };
