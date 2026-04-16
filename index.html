@@ -860,11 +860,10 @@ window.renderMembers = function() {
         </div>
     `).join(''); 
 };
-// 🛠️ [업데이트] 중복 방지 + 여성 밸런스 + 에버순 지그재그 통합 배정 엔진
-// 🛠️ [최종 완결판] 정기모임 6대 원칙 (다양한 정답지 랜덤 추출 방식 도입)
+// 🛠️ [최종 완결판] 우선순위 가중치 완벽 적용 엔진 (계급별 셔플 + 7단계 패널티)
 window.runAssignment = function() {
     try {
-        console.log("🚀 [정기모임 일반배정] 6대 원칙 적용 엔진 가동...");
+        console.log("🚀 [정기모임 일반배정] 7단계 우선순위 적용 엔진 가동...");
         
         let activeLanes = [];
         for (let l = 1; l <= 20; l++) {
@@ -882,15 +881,20 @@ window.runAssignment = function() {
         const uniqueTeamNos = [...new Set(activeLanes.map(al => al.teamNo))].sort((a,b)=>a-b);
         const numTeams = uniqueTeamNos.length;
 
-        // 1. 회원 에버리지 및 정보 세팅
-        const memberData = realMembers.map(name => {
+        let combinedList = realMembers.map(name => {
             const n = name.trim();
             const mInfo = members.find(m => m.name === n) || {};
             const stats = (typeof window.getWeightedStats === 'function') ? window.getWeightedStats(n) : {weightedAvg:0};
             return { name: n, avg: stats.weightedAvg, gender: mInfo.gender || '남', isGhost: false };
         });
 
-        // 2. 오직 '정기모임(regular_history)'의 최근 4회차 데이터만 추출
+        while(combinedList.length < totalSlots) {
+            combinedList.push({ name: "👻고스트", avg: 0, gender: '남', isGhost: true });
+        }
+        
+        // [우선순위 1] 에버순 정렬 (상위 랭커 찢어놓기 위한 사전 작업)
+        combinedList.sort((a, b) => b.avg - a.avg);
+
         const regularHistories = window.regularHistoryCache || {};
         const last4Dates = Object.keys(regularHistories).sort().reverse().slice(0, 4); 
         
@@ -904,7 +908,6 @@ window.runAssignment = function() {
             });
         });
 
-        // 🎲 완벽한 랜덤 셔플 알고리즘 (Fisher-Yates) 도입
         const shuffleArray = (arr) => {
             let array = [...arr];
             for (let i = array.length - 1; i > 0; i--) {
@@ -914,26 +917,23 @@ window.runAssignment = function() {
             return array;
         };
 
-        let validPool = []; // 조건(30점 이내 편차 등)을 만족하는 '정답지'들을 모아둘 바구니
+        let validPool = []; 
         let bestFinalTeams = null;
         let minPenalty = Infinity;
 
-        // 3. 최적 조합 시뮬레이션
-        for (let sim = 0; sim < 3000; sim++) {
-            let females = shuffleArray(memberData.filter(m => m.gender === '여'));
-            let males = shuffleArray(memberData.filter(m => m.gender !== '여'));
+        // 시뮬레이션 횟수를 5000번으로 늘려 더 많은 정답지 탐색
+        for (let sim = 0; sim < 5000; sim++) { 
+            let currentTeams = uniqueTeamNos.map(tNo => ({ teamNo: tNo, members: [], totalAvg: 0 }));
+            let shuffledList = [];
 
-            let combinedList = [...females, ...males];
-            
-            while(combinedList.length < totalSlots) {
-                combinedList.push({ name: "👻고스트", avg: 0, gender: '남', isGhost: true });
+            // [우선순위 2] 계급별 셔플 (1,2등 쏠림 완벽 차단)
+            for (let i = 0; i < combinedList.length; i += numTeams) {
+                let chunk = combinedList.slice(i, i + numTeams);
+                shuffledList.push(...shuffleArray(chunk)); 
             }
 
-            let currentTeams = uniqueTeamNos.map(tNo => ({ teamNo: tNo, members: [], totalAvg: 0 }));
-
-            // 스네이크 배정
             let teamIdx = 0, direction = 1;
-            combinedList.forEach((player) => {
+            shuffledList.forEach((player) => {
                 currentTeams[teamIdx].members.push({...player});
                 teamIdx += direction;
                 if (teamIdx >= numTeams) { teamIdx = numTeams - 1; direction = -1; }
@@ -942,53 +942,50 @@ window.runAssignment = function() {
 
             let penalty = 0;
             
-            // [조건 1] 여성 비율
+            // [우선순위 3] 여성 비율 체크 (위반 시 폭탄 패널티 100,000점)
             const fCounts = currentTeams.map(t => t.members.filter(m => m.gender === '여').length);
-            if (Math.max(...fCounts) - Math.min(...fCounts) > 1) penalty += 5000;
+            if (Math.max(...fCounts) - Math.min(...fCounts) > 1) penalty += 100000;
 
-            // [조건 2] 과거 4회 정모 중복 패널티
+            // [우선순위 4] 과거 4회 정모 중복 패널티 (강력한 패널티 1,000점)
             currentTeams.forEach(t => {
                 const names = t.members.map(m => m.name).filter(n => !n.includes("고스트"));
                 pastTeams.forEach(pastNames => {
                     const overlap = names.filter(n => pastNames.includes(n)).length;
-                    if (overlap >= 2) penalty += Math.pow(overlap, 2) * 50; 
+                    if (overlap >= 2) penalty += Math.pow(overlap, 2) * 1000; 
                 });
             });
 
-            // [조건 3] 팀 간 에버 편차 계산
+            // [우선순위 5] 팀 간 에버 편차 (편차 1점당 10점 패널티)
             const teamAvgs = currentTeams.map(t => t.members.reduce((sum, m) => sum + m.avg, 0));
             const maxAvg = Math.max(...teamAvgs);
             const minAvg = Math.min(...teamAvgs);
             const diff = maxAvg - minAvg;
             
+            penalty += diff * 10;
+
+            // [우선순위 7] 30점 초과 제한 (초과 1점당 1점의 미미한 패널티)
             if (diff > 30) {
-                penalty += (diff - 30) * 100; // 30점 초과 시 탈락 수준의 패널티
-            } else {
-                penalty += diff; // 30점 이내면 순수 편차 점수만 추가
+                penalty += (diff - 30) * 1;
             }
 
-            // 🎯 [핵심 로직 변경] 30점 이내이고, 다른 룰을 어기지 않은(패널티 30 이하) 조합은 바구니에 담기
-            if (penalty <= 30) {
+            // 패널티가 낮을수록(원칙을 잘 지킬수록) 정답지 바구니에 담음
+            if (penalty < 2000) { 
                 validPool.push(JSON.parse(JSON.stringify(currentTeams)));
-                // 훌륭한 정답지가 20개 모이면 더 계산하지 않고 스톱! (속도 최적화)
-                if (validPool.length >= 20) break; 
+                if (validPool.length >= 30) break; 
             }
 
-            // 만약 조건이 너무 빡빡해서 정답지가 하나도 안 나올 경우를 대비한 최후의 보루 (절대적 1등 저장)
             if (penalty < minPenalty) {
                 minPenalty = penalty;
                 bestFinalTeams = JSON.parse(JSON.stringify(currentTeams));
             }
         }
 
-        // 🎲 바구니에 모인 '1등급 조합' 중 하나를 무작위로 추첨! (매번 다른 결과 보장)
         if (validPool.length > 0) {
             const randomIndex = Math.floor(Math.random() * validPool.length);
             bestFinalTeams = validPool[randomIndex];
-            console.log(`총 ${validPool.length}개의 최적 조합 중 ${randomIndex + 1}번째 조합 당첨!`);
         }
 
-        // --- 결정된 팀 세부 조정 (지그재그, 고스트, 핸디캡) ---
+        // --- 결정된 팀 세부 조정 ---
         bestFinalTeams.forEach(team => {
             team.members.sort((a, b) => {
                 if(a.isGhost) return 1;
@@ -997,7 +994,6 @@ window.runAssignment = function() {
             });
         });
 
-        // 고스트 핸디
         bestFinalTeams.forEach(team => {
             team.members.forEach((m, idx) => {
                 if (m.isGhost) {
@@ -1014,7 +1010,6 @@ window.runAssignment = function() {
             team.totalAvg = team.members.reduce((sum, m) => sum + m.avg, 0);
         });
 
-        // 지그재그 레인
         bestFinalTeams.forEach(team => {
             let myLanes = activeLanes.filter(al => al.teamNo === team.teamNo).sort((a,b) => a.lane - b.lane);
             team.members.forEach((m, idx) => {
@@ -1024,11 +1019,11 @@ window.runAssignment = function() {
             });
         });
 
-        // 매치 핸디 및 여성 보너스
         const maxFinalAvg = Math.max(...bestFinalTeams.map(t => t.totalAvg));
         const femaleCounts = bestFinalTeams.map(t => t.members.filter(m => m.gender === '여').length);
         const minFemale = Math.min(...femaleCounts);
 
+        // [우선순위 6] 매치 핸디 및 여성 보너스 (절대 원칙 계산)
         bestFinalTeams.forEach(t => {
             const fCount = t.members.filter(m => m.gender === '여').length;
             const baseHandy = Math.max(0, Math.round(maxFinalAvg - t.totalAvg));
@@ -1045,12 +1040,13 @@ window.runAssignment = function() {
         }).then(() => {
             currentRankView = currentTargetGame; 
             window.showPanel('progressPanel', document.querySelectorAll('.tab-btn')[3]);
-            alert(`✅ 배정 완료! (조건을 통과한 조합 중 랜덤 추첨됨)`);
+            alert(`✅ 배정 완료! (7단계 우선순위 가중치 완벽 적용)`);
         });
     } catch (e) {
         console.error(e);
         alert("배정 중 오류 발생: " + e.message);
     }
+};
 };// 4. 앱 진입 함수
 window.enterApp = function() {
     const landing = document.getElementById('landingPage');
