@@ -1700,6 +1700,7 @@ window.renderCurrentGameStats = function() {
         </div>`;
 };
 
+// 🛠️ [원상 복구] 완벽하게 맞았던 통계 화면 출력 로직
 window.renderHistoricalStats = function() {
     const area = document.getElementById('historicalStatsTable');
     if (!area || !loggedInUser) return;
@@ -1719,10 +1720,7 @@ window.renderHistoricalStats = function() {
         return String(val);
     };
 
-    // 🎯 [핵심 수정] 엑셀 찌꺼기('평균', '합계')를 걸러내고 정상적인 날짜만 추려냅니다.
-    const allSessionDates = [...new Set(records.map(r => r.date))]
-        .filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)) 
-        .sort().reverse();
+    const allSessionDates = [...new Set(records.map(r => r.date))].sort().reverse();
     
     let n = 12; 
     if (currentStatsPeriod === '1m') n = 2;
@@ -1733,11 +1731,6 @@ window.renderHistoricalStats = function() {
 
     const clubWindowDates = (n === 999) ? allSessionDates : allSessionDates.slice(0, n);
     
-    if (clubWindowDates.length === 0) {
-        area.innerHTML = '<div style="padding:30px; text-align:center; color:#999;">유효한 날짜 데이터가 없습니다.</div>';
-        return;
-    }
-
     const oldestDate = formatExcelDate(clubWindowDates[clubWindowDates.length - 1]); 
     const newestDate = formatExcelDate(allSessionDates[0]);
 
@@ -1929,20 +1922,20 @@ window.updateConfig = function(k, v) {
     }
 };
 
-// 🛠️ [에버리지 망가짐 완벽 수리] '평균', '합계' 등 가짜 날짜 찌꺼기 완벽 차단!
+// 🛠️ [원상 복구] 완벽하게 맞았던 원래의 개인 에버리지 계산 공식
 window.getWeightedStats = function(name) {
     if (!name || name.includes("고스트")) return { weightedAvg: 0, simpleAvg12: 0 };
 
-    // 🎯 [핵심 수정] 정규식을 통해 YYYY-MM-DD 형태의 '진짜 날짜'만 12회차 기준선에 넣습니다.
-    const allSessionDates = [...new Set(records.map(r => r.date))]
-        .filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)) 
-        .sort().reverse().slice(0, 12);
+    // 1. [클럽 공통 기준] 최근 12회차 날짜 리스트 (전체 바구니)
+    const allSessionDates = [...new Set(records.map(r => r.date))].sort().reverse().slice(0, 12);
     
+    // 2. [가중치 구간 분리] 최근 6회차 vs 과거 6회차
     const recentWindow = allSessionDates.slice(0, 6);
     const pastWindow = allSessionDates.slice(6, 12);
 
     let recentScores = [], pastScores = [], totalScores12 = [];
 
+    // 3. 해당 회원의 기록을 뒤져서 각 구간에 배분
     records.filter(r => r.name === name && allSessionDates.includes(r.date)).forEach(r => {
         if(r.scs) r.scs.forEach(s => {
             const score = parseInt(s) || 0;
@@ -1954,12 +1947,14 @@ window.getWeightedStats = function(name) {
         });
     });
 
+    // 4. 구간별 평균 계산
     const getAvg = (arr) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
     
-    const simpleAvg12 = Math.round(getAvg(totalScores12));
+    const simpleAvg12 = Math.round(getAvg(totalScores12)); // 통계 탭 표시용 (단순평균)
     const recentAvg = getAvg(recentScores);
     const pastAvg = getAvg(pastScores);
 
+    // 5. [핵심] 가중치 적용 (최근 70% : 과거 30%)
     let weightedAvg = 0;
     if (recentAvg > 0 && pastAvg > 0) {
         weightedAvg = Math.round((recentAvg * 0.7) + (pastAvg * 0.3));
@@ -1968,8 +1963,8 @@ window.getWeightedStats = function(name) {
     }
 
     return { 
-        weightedAvg: weightedAvg || 0,
-        simpleAvg12: simpleAvg12 || 0
+        weightedAvg: weightedAvg || 0, // 조편성 엔진이 사용할 '진짜 실력'
+        simpleAvg12: simpleAvg12 || 0  // 통계 화면에 보여줄 '공식 에버'
     };
 };
 
@@ -2912,7 +2907,7 @@ window.setJungmoManager = function() {
     }
 };
 
-// 📊 [버그 수리 완료] 엑셀 파일 선택 시 자동으로 데이터를 분석해서 Firebase에 저장
+// 📊 [원상 복구] 엑셀 파일 선택 시 자동으로 데이터를 분석해서 Firebase에 저장
 document.getElementById('excelInput').addEventListener('change', function(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -2929,7 +2924,6 @@ document.getElementById('excelInput').addEventListener('change', function(e) {
         const sheetName = workbook.SheetNames[0];
         const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
 
-        // 🎯 [핵심 수리] 날짜가 아닌 텍스트('합계', '평균' 등)는 무조건 빈칸으로 날려버립니다.
         const convertExcelDate = (val) => {
             if (!val) return "";
             let strVal = String(val).trim();
@@ -2943,34 +2937,21 @@ document.getElementById('excelInput').addEventListener('change', function(e) {
                 const jsDate = new Date((num - 25569) * 86400 * 1000);
                 return jsDate.toISOString().split('T')[0];
             }
-            
-            if (/^\d{4}[-.]\d{2}[-.]\d{2}$/.test(strVal)) {
-                return strVal.replace(/\./g, '-');
-            }
-            
-            return ""; // 날짜 형태가 아니면 무조건 빈칸 반환!
+            return strVal;
         };
 
         const dateRow = rows[0];
         const dates = [];
         let currentTempDate = "";
+        
         let maxCols = Math.max(...rows.map(r => r.length)); 
         
         for (let i = 0; i < maxCols; i++) {
             let cellVal = dateRow[i];
-            if (cellVal !== undefined && cellVal !== null && String(cellVal).trim() !== "") {
-                let parsedDate = convertExcelDate(cellVal);
-                if (parsedDate !== "") {
-                    currentTempDate = parsedDate; 
-                }
+            if (cellVal !== undefined && cellVal !== null && String(cellVal).trim() !== "" && String(cellVal).trim() !== "이름" && String(cellVal).trim() !== "번호") {
+                currentTempDate = convertExcelDate(cellVal); 
             }
-            
-            // 🎯 정상적인 날짜일 때만 배열에 담아서 데이터 오염 방지
-            if (/^\d{4}-\d{2}-\d{2}$/.test(currentTempDate)) {
-                dates[i] = currentTempDate;
-            } else {
-                dates[i] = "";
-            }
+            dates[i] = currentTempDate;
         }
 
         let updates = {};
@@ -2982,14 +2963,14 @@ document.getElementById('excelInput').addEventListener('change', function(e) {
 
         for (let i = 2; i < rows.length; i++) {
             const row = rows[i];
+            
             const name = (row[nameIdx] || "").toString().trim();
             if (!name || name === "이름") continue;
 
             let scoresByDate = {};
             for (let j = nameIdx + 1; j < row.length; j++) {
                 const targetDate = dates[j];
-                // 🎯 빈칸(찌꺼기 열)은 여기서 완벽 차단되어 저장되지 않음!
-                if (!targetDate) continue; 
+                if (!targetDate) continue;
 
                 const score = parseInt(row[j]) || 0;
                 if (score > 0) {
