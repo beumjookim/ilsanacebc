@@ -1720,6 +1720,7 @@ window.renderHistoricalStats = function() {
         return String(val);
     };
 
+    // 🎯 [원상 복구] 여기도 바보 같은 필터를 걷어냈습니다.
     const allSessionDates = [...new Set(records.map(r => r.date))].sort().reverse();
     
     let n = 12; 
@@ -1731,6 +1732,11 @@ window.renderHistoricalStats = function() {
 
     const clubWindowDates = (n === 999) ? allSessionDates : allSessionDates.slice(0, n);
     
+    if (clubWindowDates.length === 0) {
+        area.innerHTML = '<div style="padding:30px; text-align:center; color:#999;">유효한 날짜 데이터가 없습니다.</div>';
+        return;
+    }
+
     const oldestDate = formatExcelDate(clubWindowDates[clubWindowDates.length - 1]); 
     const newestDate = formatExcelDate(allSessionDates[0]);
 
@@ -1750,6 +1756,7 @@ window.renderHistoricalStats = function() {
                     dailyHasScore = true;
                 }
             });
+            // 하루 3게임을 치든 4게임을 치든, 모임 참석 횟수는 무조건 1회로 똑똑하게 카운트
             if(dailyHasScore) statsMap[name].attendedSessions++;
         }
     });
@@ -1926,16 +1933,16 @@ window.updateConfig = function(k, v) {
 window.getWeightedStats = function(name) {
     if (!name || name.includes("고스트")) return { weightedAvg: 0, simpleAvg12: 0 };
 
-    // 1. [클럽 공통 기준] 최근 12회차 날짜 리스트 (전체 바구니)
+    // 🎯 [원상 복구] 제가 넣었던 바보 같은 날짜 필터를 삭제했습니다. 
+    // 이제 데이터베이스의 모든 날짜를 정상적으로 읽어와 클럽 기준 12회차를 정확히 잡아냅니다.
     const allSessionDates = [...new Set(records.map(r => r.date))].sort().reverse().slice(0, 12);
     
-    // 2. [가중치 구간 분리] 최근 6회차 vs 과거 6회차
     const recentWindow = allSessionDates.slice(0, 6);
     const pastWindow = allSessionDates.slice(6, 12);
 
     let recentScores = [], pastScores = [], totalScores12 = [];
 
-    // 3. 해당 회원의 기록을 뒤져서 각 구간에 배분
+    // 회원이 1번 결석했다면 11번의 날짜 점수만 정확하게 배열에 담깁니다.
     records.filter(r => r.name === name && allSessionDates.includes(r.date)).forEach(r => {
         if(r.scs) r.scs.forEach(s => {
             const score = parseInt(s) || 0;
@@ -1947,14 +1954,14 @@ window.getWeightedStats = function(name) {
         });
     });
 
-    // 4. 구간별 평균 계산
+    // 🎯 [핵심] 모은 점수를 "실제 친 게임 수(arr.length)"로 나눕니다. 결석으로 인한 억울한 감점은 0%입니다!
     const getAvg = (arr) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
     
-    const simpleAvg12 = Math.round(getAvg(totalScores12)); // 통계 탭 표시용 (단순평균)
+    const simpleAvg12 = Math.round(getAvg(totalScores12));
     const recentAvg = getAvg(recentScores);
     const pastAvg = getAvg(pastScores);
 
-    // 5. [핵심] 가중치 적용 (최근 70% : 과거 30%)
+    // 가중치 70:30 정확하게 적용
     let weightedAvg = 0;
     if (recentAvg > 0 && pastAvg > 0) {
         weightedAvg = Math.round((recentAvg * 0.7) + (pastAvg * 0.3));
@@ -1963,8 +1970,8 @@ window.getWeightedStats = function(name) {
     }
 
     return { 
-        weightedAvg: weightedAvg || 0, // 조편성 엔진이 사용할 '진짜 실력'
-        simpleAvg12: simpleAvg12 || 0  // 통계 화면에 보여줄 '공식 에버'
+        weightedAvg: weightedAvg || 0,
+        simpleAvg12: simpleAvg12 || 0
     };
 };
 
