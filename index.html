@@ -1709,11 +1709,9 @@ window.renderHistoricalStats = function() {
         return;
     }
 
-    // 🌟 [추가] 엑셀 일련번호(예: 46073)를 예쁜 날짜(YYYY-MM-DD)로 변환하는 마법사
     const formatExcelDate = (val) => {
         if (!val) return "";
         let num = parseInt(val);
-        // 숫자가 30000 이상이고 '-' 기호가 없으면 엑셀 일련번호로 간주
         if (!isNaN(num) && num > 30000 && !String(val).includes('-')) {
             const jsDate = new Date((num - 25569) * 86400 * 1000);
             return jsDate.toISOString().split('T')[0];
@@ -1721,25 +1719,28 @@ window.renderHistoricalStats = function() {
         return String(val);
     };
 
-    // 1. [클럽 공통 기준선] 장부에 있는 모든 날짜를 중복 없이 추출해서 최신순 정렬
-    const allSessionDates = [...new Set(records.map(r => r.date))].sort().reverse();
+    // 🎯 [핵심 수정] 엑셀 찌꺼기('평균', '합계')를 걸러내고 정상적인 날짜만 추려냅니다.
+    const allSessionDates = [...new Set(records.map(r => r.date))]
+        .filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)) 
+        .sort().reverse();
     
-    // 2. [12회차 윈도우 확정] 선택된 기간 버튼에 따라 클럽 공통의 기준 날짜 범위를 정함
-    let n = 12; // 기본 6개월 = 12회차
+    let n = 12; 
     if (currentStatsPeriod === '1m') n = 2;
     else if (currentStatsPeriod === '3m') n = 6;
     else if (currentStatsPeriod === '6m') n = 12;
     else if (currentStatsPeriod === '12m') n = 24;
-    else n = 999; // 전체보기
+    else n = 999; 
 
-    // 클럽의 최근 N회차 날짜들만 딱 자릅니다. (이게 공통의 '자'입니다)
     const clubWindowDates = (n === 999) ? allSessionDates : allSessionDates.slice(0, n);
     
-    // 🌟 [핵심 수정] 화면에 찍을 때 마법사(formatExcelDate)를 거쳐서 예쁜 날짜로 출력!
+    if (clubWindowDates.length === 0) {
+        area.innerHTML = '<div style="padding:30px; text-align:center; color:#999;">유효한 날짜 데이터가 없습니다.</div>';
+        return;
+    }
+
     const oldestDate = formatExcelDate(clubWindowDates[clubWindowDates.length - 1]); 
     const newestDate = formatExcelDate(allSessionDates[0]);
 
-    // 3. [개인별 계산] 모든 회원을 돌면서 '클럽 윈도우' 안에 있는 점수만 합산
     let statsMap = {};
     records.forEach(r => {
         if (clubWindowDates.includes(r.date) && r.scs) {
@@ -1760,12 +1761,11 @@ window.renderHistoricalStats = function() {
         }
     });
 
-    // 4. 리스트 변환 및 정렬 (소수점 1자리까지 정확히 출력)
     let statsList = Object.values(statsMap).map(s => ({
         ...s,
         avg: s.count > 0 ? parseFloat((s.total / s.count).toFixed(1)) : 0
     })).sort((a, b) => b.avg - a.avg);
-    // 5. 화면 출력 (기준 안내 문구 수정)
+
     let html = `
         <div style="margin-bottom:10px; font-size:0.85rem; color:#1565c0; text-align:center; background:#e3f2fd; padding:10px; border-radius:8px; border:1px solid #90caf9;">
             📅 <b>클럽 최근 ${clubWindowDates.length}회차 기준</b><br>
@@ -1929,20 +1929,20 @@ window.updateConfig = function(k, v) {
     }
 };
 
-// 조편성 및 핸디캡용 엔진도 '클럽 12회차' 기준으로 동기화
+// 🛠️ [에버리지 망가짐 완벽 수리] '평균', '합계' 등 가짜 날짜 찌꺼기 완벽 차단!
 window.getWeightedStats = function(name) {
     if (!name || name.includes("고스트")) return { weightedAvg: 0, simpleAvg12: 0 };
 
-    // 1. [클럽 공통 기준] 최근 12회차 날짜 리스트 (전체 바구니)
-    const allSessionDates = [...new Set(records.map(r => r.date))].sort().reverse().slice(0, 12);
+    // 🎯 [핵심 수정] 정규식을 통해 YYYY-MM-DD 형태의 '진짜 날짜'만 12회차 기준선에 넣습니다.
+    const allSessionDates = [...new Set(records.map(r => r.date))]
+        .filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)) 
+        .sort().reverse().slice(0, 12);
     
-    // 2. [가중치 구간 분리] 최근 6회차 vs 과거 6회차
     const recentWindow = allSessionDates.slice(0, 6);
     const pastWindow = allSessionDates.slice(6, 12);
 
     let recentScores = [], pastScores = [], totalScores12 = [];
 
-    // 3. 해당 회원의 기록을 뒤져서 각 구간에 배분
     records.filter(r => r.name === name && allSessionDates.includes(r.date)).forEach(r => {
         if(r.scs) r.scs.forEach(s => {
             const score = parseInt(s) || 0;
@@ -1954,15 +1954,12 @@ window.getWeightedStats = function(name) {
         });
     });
 
-    // 4. 구간별 평균 계산
     const getAvg = (arr) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
     
-    const simpleAvg12 = Math.round(getAvg(totalScores12)); // 통계 탭 표시용 (단순평균)
+    const simpleAvg12 = Math.round(getAvg(totalScores12));
     const recentAvg = getAvg(recentScores);
     const pastAvg = getAvg(pastScores);
 
-    // 5. [핵심] 가중치 적용 (최근 70% : 과거 30%)
-    // 만약 한쪽 구간에 기록이 없다면 있는 쪽 점수를 100% 반영합니다.
     let weightedAvg = 0;
     if (recentAvg > 0 && pastAvg > 0) {
         weightedAvg = Math.round((recentAvg * 0.7) + (pastAvg * 0.3));
@@ -1971,8 +1968,8 @@ window.getWeightedStats = function(name) {
     }
 
     return { 
-        weightedAvg: weightedAvg || 0, // 조편성 엔진이 사용할 '진짜 실력'
-        simpleAvg12: simpleAvg12 || 0  // 통계 화면에 보여줄 '공식 에버'
+        weightedAvg: weightedAvg || 0,
+        simpleAvg12: simpleAvg12 || 0
     };
 };
 
@@ -2915,7 +2912,7 @@ window.setJungmoManager = function() {
     }
 };
 
-// 📊 [진짜 엔진] 엑셀 파일 선택 시 자동으로 데이터를 분석해서 Firebase에 저장
+// 📊 [버그 수리 완료] 엑셀 파일 선택 시 자동으로 데이터를 분석해서 Firebase에 저장
 document.getElementById('excelInput').addEventListener('change', function(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -2932,62 +2929,67 @@ document.getElementById('excelInput').addEventListener('change', function(e) {
         const sheetName = workbook.SheetNames[0];
         const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
 
-        // 🌟 [추가] 엑셀 일련번호 및 8자리 숫자를 진짜 날짜로 변환하는 스마트 필터기
+        // 🎯 [핵심 수리] 날짜가 아닌 텍스트('합계', '평균' 등)는 무조건 빈칸으로 날려버립니다.
         const convertExcelDate = (val) => {
             if (!val) return "";
             let strVal = String(val).trim();
             
-            // 💡 [수정1] "20220318" 같은 8자리 숫자를 "2022-03-18"로 변환
             if (strVal.length === 8 && !isNaN(Number(strVal))) {
                 return `${strVal.substring(0,4)}-${strVal.substring(4,6)}-${strVal.substring(6,8)}`;
             }
             
             let num = Number(val);
-            // 💡 [수정2] 진짜 엑셀 날짜 번호(약 44000대)만 변환 (10만 이상은 차단)
             if (!isNaN(num) && num > 30000 && num < 100000) {
                 const jsDate = new Date((num - 25569) * 86400 * 1000);
                 return jsDate.toISOString().split('T')[0];
             }
-            return strVal;
+            
+            if (/^\d{4}[-.]\d{2}[-.]\d{2}$/.test(strVal)) {
+                return strVal.replace(/\./g, '-');
+            }
+            
+            return ""; // 날짜 형태가 아니면 무조건 빈칸 반환!
         };
 
-        // 1. 날짜 라인 분석 (첫 번째 줄에서 날짜 추출)
         const dateRow = rows[0];
         const dates = [];
         let currentTempDate = "";
-        
-        // 🚨 [치명적 오류 해결] 엑셀의 맨 마지막 날짜 병합셀이 짤리는 현상 방지!
-        // 행들 중에서 가장 긴 행(점수가 다 적힌 행)의 길이를 기준으로 넉넉하게 끝까지 스캔합니다.
         let maxCols = Math.max(...rows.map(r => r.length)); 
         
         for (let i = 0; i < maxCols; i++) {
             let cellVal = dateRow[i];
-            if (cellVal !== undefined && cellVal !== null && String(cellVal).trim() !== "" && String(cellVal).trim() !== "이름" && String(cellVal).trim() !== "번호") {
-                currentTempDate = convertExcelDate(cellVal); 
+            if (cellVal !== undefined && cellVal !== null && String(cellVal).trim() !== "") {
+                let parsedDate = convertExcelDate(cellVal);
+                if (parsedDate !== "") {
+                    currentTempDate = parsedDate; 
+                }
             }
-            dates[i] = currentTempDate; // 짤림 없이 마지막 날짜의 2G, 3G, 4G까지 날짜가 꽉 채워집니다.
+            
+            // 🎯 정상적인 날짜일 때만 배열에 담아서 데이터 오염 방지
+            if (/^\d{4}-\d{2}-\d{2}$/.test(currentTempDate)) {
+                dates[i] = currentTempDate;
+            } else {
+                dates[i] = "";
+            }
         }
-        // 2. 점수 데이터 분석 (세 번째 줄부터 시작)
+
         let updates = {};
         let count = 0;
         
-        // 💡 [수정4] 이름(Name)이 있는 열(Column) 번호 자동 찾기 (CSV의 빈 콤마 대응)
         let nameIdx = rows[1].findIndex(c => c === "이름");
         if (nameIdx === -1) nameIdx = rows[0].findIndex(c => c === "이름");
-        if (nameIdx === -1) nameIdx = 2; // 파일 구조상 3번째 칸(index 2)이 이름
+        if (nameIdx === -1) nameIdx = 2; 
 
         for (let i = 2; i < rows.length; i++) {
             const row = rows[i];
-            
-            // 💡 [수정5] 찾은 nameIdx 칸(row[2])에서 정확히 이름 추출
             const name = (row[nameIdx] || "").toString().trim();
             if (!name || name === "이름") continue;
 
-            // 💡 [수정6] +4칸씩 건너뛰던 낡은 방식 삭제 -> 날짜별로 점수 바구니에 담기 (3게임, 4게임 모두 호환)
             let scoresByDate = {};
             for (let j = nameIdx + 1; j < row.length; j++) {
                 const targetDate = dates[j];
-                if (!targetDate) continue;
+                // 🎯 빈칸(찌꺼기 열)은 여기서 완벽 차단되어 저장되지 않음!
+                if (!targetDate) continue; 
 
                 const score = parseInt(row[j]) || 0;
                 if (score > 0) {
@@ -2996,7 +2998,6 @@ document.getElementById('excelInput').addEventListener('change', function(e) {
                 }
             }
 
-            // 날짜별로 묶인 점수를 서버 전송 양식(updates)에 담기
             for (const [date, scs] of Object.entries(scoresByDate)) {
                 if (scs.length > 0) {
                     const safeKey = `${date}_${name.replace(/[.#$/[\]]/g, "_")}`;
@@ -3010,18 +3011,17 @@ document.getElementById('excelInput').addEventListener('change', function(e) {
             }
         }
 
-        // 3. Firebase에 일괄 전송
         if (Object.keys(updates).length > 0) {
             db.ref().update(updates).then(() => {
-                document.getElementById('excelInput').value = ''; // 🌟 [핵심 추가] 브라우저 기억 강제 삭제!
+                document.getElementById('excelInput').value = ''; 
                 alert(`🎉 성공! ${count}개의 게임 기록을 엑셀에서 완벽히 가져왔습니다.\n앱을 새로고침하여 통계 탭을 확인하세요!`);
                 location.reload();
             }).catch(err => {
-                document.getElementById('excelInput').value = ''; // 🌟 [핵심 추가]
+                document.getElementById('excelInput').value = ''; 
                 alert("🚨 업로드 오류: " + err.message);
             });
         } else {
-            document.getElementById('excelInput').value = ''; // 🌟 [핵심 추가]
+            document.getElementById('excelInput').value = ''; 
             alert("❌ 엑셀에서 읽을 수 있는 점수 데이터가 없습니다.");
         }
     };
