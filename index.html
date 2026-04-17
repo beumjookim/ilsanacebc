@@ -860,10 +860,9 @@ window.renderMembers = function() {
         </div>
     `).join(''); 
 };
-// 🛠️ [최종 완결판] 우선순위 가중치 완벽 적용 엔진 (계급별 셔플 + 7단계 패널티)
 window.runAssignment = function() {
     try {
-        console.log("🚀 [정기모임 일반배정] 7단계 우선순위 적용 엔진 가동...");
+        console.log("🚀 [정기모임 일반배정] 투명 고스트 방지 및 7단계 우선순위 적용...");
         
         let activeLanes = [];
         for (let l = 1; l <= 20; l++) {
@@ -874,12 +873,12 @@ window.runAssignment = function() {
 
         const realMembers = attendees.filter(n => n && !n.includes("고스트"));
         
-        let requiredPerLane = Math.ceil(realMembers.length / activeLanes.length);
-        if (requiredPerLane < 1) requiredPerLane = 1;
-        let totalSlots = activeLanes.length * requiredPerLane;
-
         const uniqueTeamNos = [...new Set(activeLanes.map(al => al.teamNo))].sort((a,b)=>a-b);
         const numTeams = uniqueTeamNos.length;
+
+        // 🎯 [핵심 수리] 레인 수가 아닌 '팀 수'를 기준으로 정확한 필요 슬롯 계산!
+        let membersPerTeam = Math.ceil(realMembers.length / numTeams);
+        let totalSlots = numTeams * membersPerTeam;
 
         let combinedList = realMembers.map(name => {
             const n = name.trim();
@@ -888,11 +887,11 @@ window.runAssignment = function() {
             return { name: n, avg: stats.weightedAvg, gender: mInfo.gender || '남', isGhost: false };
         });
 
+        // 딱 필요한 만큼만 고스트 투입
         while(combinedList.length < totalSlots) {
             combinedList.push({ name: "👻고스트", avg: 0, gender: '남', isGhost: true });
         }
         
-        // [우선순위 1] 에버순 정렬 (상위 랭커 찢어놓기 위한 사전 작업)
         combinedList.sort((a, b) => b.avg - a.avg);
 
         const regularHistories = window.regularHistoryCache || {};
@@ -921,12 +920,10 @@ window.runAssignment = function() {
         let bestFinalTeams = null;
         let minPenalty = Infinity;
 
-        // 시뮬레이션 횟수를 5000번으로 늘려 더 많은 정답지 탐색
         for (let sim = 0; sim < 5000; sim++) { 
             let currentTeams = uniqueTeamNos.map(tNo => ({ teamNo: tNo, members: [], totalAvg: 0 }));
             let shuffledList = [];
 
-            // [우선순위 2] 계급별 셔플 (1,2등 쏠림 완벽 차단)
             for (let i = 0; i < combinedList.length; i += numTeams) {
                 let chunk = combinedList.slice(i, i + numTeams);
                 shuffledList.push(...shuffleArray(chunk)); 
@@ -942,11 +939,9 @@ window.runAssignment = function() {
 
             let penalty = 0;
             
-            // [우선순위 3] 여성 비율 체크 (위반 시 폭탄 패널티 100,000점)
             const fCounts = currentTeams.map(t => t.members.filter(m => m.gender === '여').length);
             if (Math.max(...fCounts) - Math.min(...fCounts) > 1) penalty += 100000;
 
-            // [우선순위 4] 과거 4회 정모 중복 패널티 (강력한 패널티 1,000점)
             currentTeams.forEach(t => {
                 const names = t.members.map(m => m.name).filter(n => !n.includes("고스트"));
                 pastTeams.forEach(pastNames => {
@@ -955,20 +950,14 @@ window.runAssignment = function() {
                 });
             });
 
-            // [우선순위 5] 팀 간 에버 편차 (편차 1점당 10점 패널티)
             const teamAvgs = currentTeams.map(t => t.members.reduce((sum, m) => sum + m.avg, 0));
             const maxAvg = Math.max(...teamAvgs);
             const minAvg = Math.min(...teamAvgs);
             const diff = maxAvg - minAvg;
             
             penalty += diff * 10;
+            if (diff > 30) penalty += (diff - 30) * 1;
 
-            // [우선순위 7] 30점 초과 제한 (초과 1점당 1점의 미미한 패널티)
-            if (diff > 30) {
-                penalty += (diff - 30) * 1;
-            }
-
-            // 패널티가 낮을수록(원칙을 잘 지킬수록) 정답지 바구니에 담음
             if (penalty < 2000) { 
                 validPool.push(JSON.parse(JSON.stringify(currentTeams)));
                 if (validPool.length >= 30) break; 
@@ -985,7 +974,6 @@ window.runAssignment = function() {
             bestFinalTeams = validPool[randomIndex];
         }
 
-        // --- 결정된 팀 세부 조정 ---
         bestFinalTeams.forEach(team => {
             team.members.sort((a, b) => {
                 if(a.isGhost) return 1;
@@ -1023,7 +1011,6 @@ window.runAssignment = function() {
         const femaleCounts = bestFinalTeams.map(t => t.members.filter(m => m.gender === '여').length);
         const minFemale = Math.min(...femaleCounts);
 
-        // [우선순위 6] 매치 핸디 및 여성 보너스 (절대 원칙 계산)
         bestFinalTeams.forEach(t => {
             const fCount = t.members.filter(m => m.gender === '여').length;
             const baseHandy = Math.max(0, Math.round(maxFinalAvg - t.totalAvg));
@@ -1040,7 +1027,7 @@ window.runAssignment = function() {
         }).then(() => {
             currentRankView = currentTargetGame; 
             window.showPanel('progressPanel', document.querySelectorAll('.tab-btn')[3]);
-            alert(`✅ 배정 완료! (7단계 우선순위 가중치 완벽 적용)`);
+            alert(`✅ 배정 완료! (팀 에버리지 밸런스 완벽 적용)`);
         });
     } catch (e) {
         console.error(e);
@@ -1997,13 +1984,17 @@ window.renderGameProgress = function() {
     for(let i=1; i<=settings.gameCount; i++) tHtml += `<div class="rank-tab ${currentRankView===i?'active':''}" onclick="currentRankView=${i};window.renderGameProgress()">${i}G</div>`;
     tBox.innerHTML = tHtml;
     const gData = gameTeams[currentRankView] || [];
-    const renderMem = (m, teamMatchHandy) => {
+    
+    const renderMem = (m) => {
         if(!m) return "";
-        const isG = m.name.includes("고스트");
+        const isG = m.name.includes("고스트") || m.isGhost;
         const s = window.getWeightedStats(m.name);
         const mInfo = members.find(x => x.name === m.name) || {};
-        const h = isG ? (parseInt(teamMatchHandy) || 0) : (parseInt(mInfo.handicap) || 0);
+        
+        // 🎯 [핵심 수정] 고스트의 핸디캡(H)은 무조건 타팀 에버 평균(m.avg)이 됩니다!
+        const h = isG ? parseInt(m.avg) : (parseInt(mInfo.handicap) || 0);
         const total = (parseInt(m.score) || 0) + h;
+        
         let arrow = '';
         if(!isG) {
             if(s.weightedAvg > s.simpleAvg12) arrow = '<span style="color:red;">▲</span>';
@@ -2013,17 +2004,27 @@ window.renderGameProgress = function() {
         return `
             <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #f1f1f1; align-items:center;">
                 <div style="line-height:1.2;">
-                    <b style="font-size:1.05rem;">${m.name}</b><br>
-                    <small style="color:#666;">${!isG ? `(${s.simpleAvg12 || 0}) <b>${s.weightedAvg || 0}</b> ${arrow}` : '고스트'} <b style="color:#8e44ad; margin-left:4px;">H:${h}</b></small>
+                    <b style="font-size:1.05rem; ${isG ? 'color:#e74c3c;' : ''}">${m.name}</b><br>
+                    <small style="color:#666;">${!isG ? `(${s.simpleAvg12 || 0}) <b>${s.weightedAvg || 0}</b> ${arrow}` : `<span style="color:#e74c3c;">(타팀평균)</span>`} <b style="color:#8e44ad; margin-left:4px;">H:${h}</b></small>
                 </div>
-                <div style="font-size:1.15rem; font-weight:bold;">${total}</div>
+                <div style="font-size:1.15rem; font-weight:bold; ${isG ? 'color:#e74c3c;' : ''}">${total}</div>
             </div>`;
     };
+    
     const cardsHtml = gData.map(t => {
         let teamSum = (parseInt(t.matchHandy) || 0);
-        t.members.forEach(m => teamSum += (parseInt(m.score) || 0) + (m.name.includes("고스트") ? 0 : (parseInt(members.find(x=>x.name===m.name)?.handicap) || 0)));
-        const L = [t.members[0], t.members[2], t.members[4]]; 
-        const R = [t.members[1], t.members[3]]; 
+        t.members.forEach(m => {
+            const isG = m.name.includes("고스트") || m.isGhost;
+            const mInfo = members.find(x=>x.name===m.name) || {};
+            // 🎯 팀 총점 계산 시에도 고스트의 핸디(m.avg)를 완벽하게 합산
+            const h = isG ? parseInt(m.avg) : (parseInt(mInfo.handicap) || 0);
+            teamSum += (parseInt(m.score) || 0) + h;
+        });
+        
+        // 🎯 [핵심 수리] 동적으로 좌우 레인을 가릅니다 (숨겨지는 인원 원천 차단)
+        const L = t.members.filter((_, idx) => idx % 2 === 0); 
+        const R = t.members.filter((_, idx) => idx % 2 !== 0); 
+        
         return `
             <div class="team-card" style="margin-bottom:20px; border:2px solid #6c5ce7; border-radius:12px; overflow:hidden; background:white;">
                 <div class="team-header" onclick="window.goToInput(${currentRankView}, ${t.teamNo})" style="background:#6c5ce7; color:white; padding:10px 15px; display:flex; justify-content:space-between; align-items:center;">
@@ -2033,16 +2034,17 @@ window.renderGameProgress = function() {
                 <div style="display: flex;">
                     <div style="flex: 1.1; border-right: 1px dashed #ddd; padding: 10px;">
                         <div style="text-align:center; font-weight:bold; color:#3498db; font-size:0.8rem; background:#f0f8ff; border-radius:4px; margin-bottom:5px;">${L[0]?.lane || '?'}L (좌)</div>
-                        ${L.map(m => renderMem(m, t.matchHandy)).join('')}
+                        ${L.map(m => renderMem(m)).join('')}
                     </div>
                     <div style="flex: 1; padding: 10px;">
                         <div style="text-align:center; font-weight:bold; color:#e67e22; font-size:0.8rem; background:#fff5eb; border-radius:4px; margin-bottom:5px;">${R[0]?.lane || '?'}L (우)</div>
-                        ${R.map(m => renderMem(m, t.matchHandy)).join('')}
+                        ${R.map(m => renderMem(m)).join('')}
                     </div>
                 </div>
                 ${t.matchHandy > 0 ? `<div style="font-size:0.75rem; color:#8e44ad; padding:4px; text-align:center; background:#f3f0ff; border-top:1px solid #eee; font-weight:bold;">🛡️ 매치 핸디 보너스 +${t.matchHandy}</div>` : ''}
             </div>`;
     }).join('') || '<div style="text-align:center; padding:50px; color:#999;">데이터 없음</div>';
+    
     document.getElementById('teamCardArea').innerHTML = cardsHtml;
 };
 
@@ -2568,7 +2570,6 @@ window.renderInputs = function() {
     if (!area) return;
 
     const myName = (loggedInUser || "").trim();
-    // 🛡️ [권한 체크 1] 운영진(관리자, 정모장, 번개장) 여부 확인
     const isPowerfulManager = isAdmin || (managers.jungmo === myName) || (managers.lightning === myName);
     
     const count = settings.gameCount || 4;
@@ -2590,7 +2591,6 @@ window.renderInputs = function() {
         const isTeamLeader = (myName === teamLeader);
         const isMyTeam = t.members.some(m => m.name === myName);
 
-        // 👁️ [시각적 격리] 운영진이 아니고 내 팀도 아니면 화면에서 숨김
         if (!isPowerfulManager && !isMyTeam) return;
 
         h += `<div class="input-team-box" style="border: 2px solid ${isMyTeam ? 'var(--accent)' : '#eee'};">
@@ -2602,14 +2602,13 @@ window.renderInputs = function() {
         t.members.forEach(m => {
             const isMe = (m.name === myName);
             const isGhost = m.name.includes("고스트") || m.isGhost;
-            
-            // 🛡️ [입력 권한] 본인, 해당 팀장, 또는 운영진(관리자/정모장/번개장)만 수정 가능
             const canEdit = isMe || isTeamLeader || isPowerfulManager;
 
             h += `
             <div class="score-row" style="display:flex; justify-content:space-between; align-items:center; padding:10px 15px; border-bottom:1px solid #eee;">
                 <span class="score-name" style="${isMe ? 'color:var(--accent); font-weight:bold;' : ''}">
                     ${m.name} ${isMe ? '(나)' : ''}
+                    ${isGhost ? `<br><small style="font-size:0.8rem; color:#e74c3c; font-weight:normal;">(자동 배점 H:${m.avg})</small>` : ''}
                 </span>
 
                 <input type="number" inputmode="numeric" class="score-input"
@@ -2622,7 +2621,6 @@ window.renderInputs = function() {
             </div>`;
         });
 
-        // 💾 [저장 권한] 팀장 또는 운영진(관리자/정모장/번개장)에게만 버튼 노출
         if (isTeamLeader || isPowerfulManager) {
             h += `
             <div style="padding:15px; background:#f0f7ff; text-align:center;">
@@ -2634,7 +2632,7 @@ window.renderInputs = function() {
         h += `</div>`;
     });
     area.innerHTML = h || '<div style="padding:40px; text-align:center; color:#999;">회원님의 팀 정보를 찾을 수 없습니다.</div>';
-};;
+};
 
 window.regularHistoryCache = null;
 
